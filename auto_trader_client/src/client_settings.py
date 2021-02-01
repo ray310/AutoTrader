@@ -11,4 +11,4 @@ BUCKET_KEY = "storage_bucket"  # key to access bucket located at BUCKET_INFO_LOC
 DEFAULT_ORDER_DIR = "orders"
 
 # Order settings
-LIMIT_ORDER_PERCENTAGE = 0.20
+LIMIT_ORDER_PERCENTAGE = 0.50
