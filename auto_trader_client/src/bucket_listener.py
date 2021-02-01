@@ -9,6 +9,7 @@ from google.cloud import storage
 
 class BucketListener:
     """Class object listens to a GCP bucket and downloads updates"""
+
     def __init__(self, gcp_bucket_name, gcp_creds_path, local_directory, sleep_time=1):
         self._gcp_creds_path = gcp_creds_path
         self._client = self._authenticate_client()

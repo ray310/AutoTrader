@@ -18,7 +18,7 @@ import src.order_monitor as om
 async def start_workers(bucket_name):
     await asyncio.gather(
         bl.BucketListener(bucket_name, GCP_CREDS_PATH, DEFAULT_ORDER_DIR).run(),
-        om.OrderMonitor(DEFAULT_ORDER_DIR).run()
+        om.OrderMonitor(DEFAULT_ORDER_DIR).run(),
     )
 
 
