@@ -1,9 +1,10 @@
 """ Takes text data and parses it for specified pattern to generate order parameters """
 
 
-def text_to_order_string(string):
+def text_to_order_params(string):
     """ Parses string for signal. If string contains one and only one order signal,
-    then it outputs the order parameters as strings and any additional comments.
+    then it returns the order parameters as strings and any additional comments,
+    else returns None
     Format example:
         'STC INTC 50C 12/31 @.45'
         <Open/close> <ticker> <strike price + call or put> <expiration date> <@ price>
@@ -13,8 +14,8 @@ def text_to_order_string(string):
 
     # Regex Formatting
     # () denote regex groupings. Regex 'or' uses short-circuit evaluation
-    # (?<!\w) is negative lookbehind assertion for any non-whitespace character
-    # BTO/STC cannot be preceeded by any word character
+    # (?<!\S) is negative lookbehind assertion for any non-whitespace character
+    # BTO/STC cannot be preceded by any word character
     instruction = "((?<!\S)BTO|(?<!\S)STC)"
     ticker_pattern = "([A-Z]{1,5})"  # 1-5 capitalized letters
 
@@ -26,10 +27,9 @@ def text_to_order_string(string):
     # month and day can be 1-2 digits
     expiration_date = "([0-9]{1,2}/[0-9]{1,2}/[0-9]{4}|[0-9]{1,2}/[0-9]{1,2}/[0-9]{2}|[0-9]{1,2}/[0-9]{1,2})"
 
-    # (?!\w) is negative lookahead assertion for any non-whitespace character
-    contract_price = (
-        "([0-9]{0,4}\.[0-9]{2}(?!\S))"  # up to 4 digit number followed by 2 decimals
-    )
+    # (?!\S) is negative lookahead assertion for any non-whitespace character
+    # up to 4 digit number followed by 1-2 decimals
+    contract_price = "([0-9]{0,4}\.[0-9]{1,2}(?!\S))"
     space = "\s{1,2}"  # 1-2 spaces
     at = "@\s{0,1}"  # @ followed by 0-1 spaces
     regex_pattern = (
