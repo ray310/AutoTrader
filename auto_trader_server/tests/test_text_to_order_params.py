@@ -15,12 +15,12 @@ NULL_ORD_PARAM = {
 
 def test_ttop_empty_string():
     """No input returns null order"""
-    assert ttop.text_to_order_string("") == NULL_ORD_PARAM
+    assert ttop.text_to_order_string("") is None
 
 
 def test_ttop_no_signal():
-    """sString with no signal returns null order"""
-    assert ttop.text_to_order_string("Closing 100% Positions") == NULL_ORD_PARAM
+    """String with no signal returns null order"""
+    assert ttop.text_to_order_string("Closing 100% Positions") is None
 
 
 def test_ttop_valid_signal():
@@ -75,7 +75,7 @@ def test_ttop_embedded_signals():
 def test_ttop_two_valid_signals():
     """Two valid signals in same message return null"""
     string = "BTO INTC 50C 12/31 @0.45"
-    assert ttop.text_to_order_string(string + " " + string) == NULL_ORD_PARAM
+    assert ttop.text_to_order_string(string + " " + string) is None
 
 
 def test_ttop_valid_instruction():
@@ -111,9 +111,7 @@ def test_ttop_invalid_instructions():
     cart_product = ["".join(x) for x in itertools.product(chars, repeat=3)]
     invalid_cart_product = [x for x in cart_product if x != "BTO" and x != "STC"]
     for combo in invalid_cart_product:
-        assert (
-            ttop.text_to_order_string(combo + " INTC 50C 12/31 @.45") == NULL_ORD_PARAM
-        )
+        assert ttop.text_to_order_string(combo + " INTC 50C 12/31 @.45") is None
 
 
 def test_ttop_instruction_with_extra_char():
@@ -123,14 +121,7 @@ def test_ttop_instruction_with_extra_char():
     prefixes = ["BTO", "STC", "B", "C", "S", "T", "/"]
     extra_char_prefix = ["".join(x) for x in itertools.permutations(prefixes, 2)]
     for combo in extra_char_prefix:
-        try:
-            assert (
-                ttop.text_to_order_string(combo + " INTC 50C 12/31 @.45")
-                == NULL_ORD_PARAM
-            )
-        except:
-            print(combo)
-            print(ttop.text_to_order_string(combo + " INTC 50C 12/31 @.45"))
+        assert ttop.text_to_order_string(combo + " INTC 50C 12/31 @.45") is None
 
 
 def test_ttop_valid_tickers():
@@ -199,10 +190,7 @@ def test_ttop_invalid_tickers():
         "INtC",
     ]
     for ticker in tickers:
-        assert (
-            ttop.text_to_order_string("BTO " + ticker + " 50C 12/31 @0.45")
-            == NULL_ORD_PARAM
-        )
+        assert ttop.text_to_order_string("BTO " + ticker + " 50C 12/31 @0.45") is None
 
 
 def test_ttop_valid_strike_price():
@@ -242,8 +230,7 @@ def test_ttop_invalid_strike_price():
     ]
     for price in strike_prices:
         assert (
-            ttop.text_to_order_string("BTO INTC " + price + "C " "12/31 @0.45")
-            == NULL_ORD_PARAM
+            ttop.text_to_order_string("BTO INTC " + price + "C " "12/31 @0.45") is None
         )
 
 
@@ -283,8 +270,7 @@ def test_ttop_invalid_contract_type():
     ]
     for contract in invalid_contract_types:
         assert (
-            ttop.text_to_order_string("BTO INTC 50" + contract + " 12/31 @0.45")
-            == NULL_ORD_PARAM
+            ttop.text_to_order_string("BTO INTC 50" + contract + " 12/31 @0.45") is None
         )
 
 
@@ -352,7 +338,7 @@ def test_ttop_invalid_expiration():
                 ttop.text_to_order_string(
                     "BTO INTC 50C " + expiration + year + " @0.45"
                 )
-                == NULL_ORD_PARAM
+                is None
             )
 
 
@@ -389,14 +375,12 @@ def test_ttop_wrong_at_syntax():
         "@  0.45",
     ]
     for invalid in invalid_at:
-        assert (
-            ttop.text_to_order_string("BTO INTC 50C 12/31 " + invalid) == NULL_ORD_PARAM
-        )
+        assert ttop.text_to_order_string("BTO INTC 50C 12/31 " + invalid) is None
 
 
 def test_ttop_valid_contract_price():
     """Valid contract prices of 0-4 digits followed
-    by two decimals return valid order parameters"""
+    by one or two decimals return valid order parameters"""
     sample_ord_params = {
         "instruction": "BTO",
         "ticker": "INTC",
@@ -406,7 +390,19 @@ def test_ttop_valid_contract_price():
         "contract_price": "0.45",
         "comments": None,
     }
-    valid_contract_prices = [".12", "0.12", "12.34", "123.45", "1234.56", "1234.56"]
+    valid_contract_prices = [
+        ".12",
+        "0.12",
+        "12.34",
+        "123.45",
+        "1234.56",
+        ".1",
+        "0.1",
+        "12.3",
+        "123.4",
+        "1234.5",
+        "1234.5",
+    ]
     for price in valid_contract_prices:
         sample_ord_params["contract_price"] = price
         assert (
@@ -417,14 +413,16 @@ def test_ttop_valid_contract_price():
 
 def test_ttop_invalid_contract_price():
     """Invalid contract prices not containing 0-4 digits followed
-    by two decimals return null"""
+    by one or two decimals return null"""
     invalid_contract_prices = [
         "",
+        "@",
         "/",
         "A",
-        ".1",
-        "1.1",
-        "12.1",
+        ".133",
+        "z.1",
+        "@2.z",
+        "@1.23",
         "12.234",
         "12345.12",
         "12.12A",
@@ -432,10 +430,4 @@ def test_ttop_invalid_contract_price():
         "12.34/",
     ]
     for price in invalid_contract_prices:
-        try:
-            assert (
-                ttop.text_to_order_string("BTO INTC 50C 12/31 @" + price)
-                == NULL_ORD_PARAM
-            )
-        except:
-            print(ttop.text_to_order_string("BTO INTC 50C 12/31 @" + price))
+        assert ttop.text_to_order_string("BTO INTC 50C 12/31 @" + price) is None
