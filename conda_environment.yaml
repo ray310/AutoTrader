@@ -3,6 +3,7 @@ dependencies:
     - python=3.8
     - pip=20.3.3
     - black=19.10b0
+    - pytest=6.2.2
     - pip:
         - discord.py==1.6.0
         - google-cloud-storage==1.35.0
