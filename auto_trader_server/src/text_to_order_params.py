@@ -28,8 +28,8 @@ def text_to_order_params(string):
     expiration_date = "([0-9]{1,2}/[0-9]{1,2}/[0-9]{4}|[0-9]{1,2}/[0-9]{1,2}/[0-9]{2}|[0-9]{1,2}/[0-9]{1,2})"
 
     # (?!\S) is negative lookahead assertion for any non-whitespace character
-    # up to 4 digit number followed by 1-2 decimals
-    contract_price = "([0-9]{0,4}\.[0-9]{1,2}(?!\S))"
+    # up to 3 digit number followed by 1-2 decimals
+    contract_price = "([0-9]{0,3}\.[0-9]{1,2}(?!\S))"
     space = "\s{1,2}"  # 1-2 spaces
     at = "@\s{0,1}"  # @ followed by 0-1 spaces
     regex_pattern = (

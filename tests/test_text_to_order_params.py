@@ -2,6 +2,9 @@
 
 from auto_trader_server.src import text_to_order_params as ttop
 
+
+#TODO: Remove NULL and create base object that can be mutated in pytest context
+#TODO: Remove cut and paste
 NULL_ORD_PARAM = {
     "instruction": None,
     "ticker": None,
@@ -194,7 +197,7 @@ def test_ttop_invalid_tickers():
 
 
 def test_ttop_valid_strike_price():
-    """Valid strike prices of 1-4 digits
+    """Valid strike prices of 1-5 digits
     possibly followed by 1-2 decimals return valid order parameters"""
     sample_ord_params = {
         "instruction": "BTO",
@@ -205,7 +208,7 @@ def test_ttop_valid_strike_price():
         "contract_price": "0.45",
         "comments": None,
     }
-    strike_prices = ["1", "12", "123", "1234", "1234.5", "1234.56"]
+    strike_prices = ["1", "12", "123", "1234", "1234.5", "1234.56", "12345.5", "12345.67"]
     for price in strike_prices:
         sample_ord_params["strike_price"] = price
         assert (
@@ -215,7 +218,7 @@ def test_ttop_valid_strike_price():
 
 
 def test_ttop_invalid_strike_price():
-    """Invalid strike prices without 1-4 digits
+    """Invalid strike prices without 1-5 digits
     possibly followed by 1-2 decimals return null order"""
     strike_prices = [
         "",
@@ -379,7 +382,7 @@ def test_ttop_wrong_at_syntax():
 
 
 def test_ttop_valid_contract_price():
-    """Valid contract prices of 0-4 digits followed
+    """Valid contract prices of 0-3 digits followed
     by one or two decimals return valid order parameters"""
     sample_ord_params = {
         "instruction": "BTO",
@@ -395,13 +398,10 @@ def test_ttop_valid_contract_price():
         "0.12",
         "12.34",
         "123.45",
-        "1234.56",
         ".1",
         "0.1",
         "12.3",
         "123.4",
-        "1234.5",
-        "1234.5",
     ]
     for price in valid_contract_prices:
         sample_ord_params["contract_price"] = price
@@ -424,6 +424,7 @@ def test_ttop_invalid_contract_price():
         "@2.z",
         "@1.23",
         "12.234",
+        "1234.12",
         "12345.12",
         "12.12A",
         "1A.12",
