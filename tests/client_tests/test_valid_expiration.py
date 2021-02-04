@@ -1,3 +1,5 @@
+"""Testing the expiration validation functions"""
+
 import datetime
 import auto_trader_client.src.validate_params as vp
 
