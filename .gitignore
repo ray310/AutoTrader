@@ -4,6 +4,10 @@
 *.idea
 *.json
 *.exe
+*.doc
+*.docx
 *.coverage
 htmlcov/
+logs/
+reference/
 
