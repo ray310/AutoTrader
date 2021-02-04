@@ -2,17 +2,14 @@
 
 from auto_trader_server.src import text_to_order_params as ttop
 
-
-# TODO: Remove NULL and create base object that can be mutated in pytest context
-# TODO: Remove cut and paste
-NULL_ORD_PARAM = {
-    "instruction": None,
-    "ticker": None,
-    "strike_price": None,
-    "contract_type": None,
-    "expiration": None,
-    "contract_price": None,
-    "comments": None,
+ORD_PARAMS = {
+        "instruction": "BTO",
+        "ticker": "INTC",
+        "strike_price": "50",
+        "contract_type": "C",
+        "expiration": "12/31",
+        "contract_price": "0.45",
+        "comments": None,
 }
 
 
@@ -28,50 +25,33 @@ def test_ttop_no_signal():
 
 def test_ttop_valid_signal():
     """Valid signal in string returns valid order parameters"""
-    sample_ord_params = {
-        "instruction": "BTO",
-        "ticker": "INTC",
-        "strike_price": "50",
-        "contract_type": "C",
-        "expiration": "12/31",
-        "contract_price": "0.45",
-        "comments": None,
-    }
-    assert ttop.text_to_order_params("BTO INTC 50C 12/31 @0.45") == sample_ord_params
+    assert ttop.text_to_order_params("BTO INTC 50C 12/31 @0.45") == ORD_PARAMS
 
 
-def test_ttop_embedded_signals():
+def test_ttop_embedded_signals(monkeypatch):
     """Valid signals embedded in text return valid order parameters"""
-    sample_ord_params = {
-        "instruction": "BTO",
-        "ticker": "INTC",
-        "strike_price": "50",
-        "contract_type": "C",
-        "expiration": "12/31",
-        "contract_price": "0.45",
-        "comments": "comments ",
-    }
+    monkeypatch.setitem(ORD_PARAMS, "comments", "comments ")
     assert (
         ttop.text_to_order_params("comments BTO INTC 50C 12/31 @0.45")
-        == sample_ord_params
+        == ORD_PARAMS
     )
 
-    sample_ord_params["comments"] = "comments  comments"
+    monkeypatch.setitem(ORD_PARAMS, "comments", "comments  comments")
     assert (
         ttop.text_to_order_params("comments BTO INTC 50C 12/31 @0.45 comments")
-        == sample_ord_params
+        == ORD_PARAMS
     )
 
-    sample_ord_params["comments"] = "comments\n"
+    monkeypatch.setitem(ORD_PARAMS, "comments", "comments\n")
     assert (
         ttop.text_to_order_params("comments\nBTO INTC 50C 12/31 @0.45")
-        == sample_ord_params
+        == ORD_PARAMS
     )
 
-    sample_ord_params["comments"] = "comments\n\ncomments"
+    monkeypatch.setitem(ORD_PARAMS, "comments", "comments\n\ncomments")
     assert (
         ttop.text_to_order_params("comments\nBTO INTC 50C 12/31 @0.45\ncomments")
-        == sample_ord_params
+        == ORD_PARAMS
     )
 
 
@@ -81,23 +61,14 @@ def test_ttop_two_valid_signals():
     assert ttop.text_to_order_params(string + " " + string) is None
 
 
-def test_ttop_valid_instruction():
+def test_ttop_valid_instruction(monkeypatch):
     """Valid instruction BTO/STC returns valid order parameters"""
-    sample_ord_params = {
-        "instruction": "BTO",
-        "ticker": "INTC",
-        "strike_price": "50",
-        "contract_type": "C",
-        "expiration": "12/31",
-        "contract_price": "0.45",
-        "comments": None,
-    }
     valid_instructions = ["BTO", "STC"]
     for valid in valid_instructions:
-        sample_ord_params["instruction"] = valid
+        monkeypatch.setitem(ORD_PARAMS, "instruction", valid)
         assert (
             ttop.text_to_order_params(valid + " INTC 50C 12/31 @0.45")
-            == sample_ord_params
+            == ORD_PARAMS
         )
 
 
@@ -127,17 +98,8 @@ def test_ttop_instruction_with_extra_char():
         assert ttop.text_to_order_params(combo + " INTC 50C 12/31 @.45") is None
 
 
-def test_ttop_valid_tickers():
+def test_ttop_valid_tickers(monkeypatch):
     """Tickers with 1-5 capital letters return valid order parameters"""
-    sample_ord_params = {
-        "instruction": "BTO",
-        "ticker": "INTC",
-        "strike_price": "50",
-        "contract_type": "C",
-        "expiration": "12/31",
-        "contract_price": "0.45",
-        "comments": None,
-    }
     tickers = [
         "I",
         "IN",
@@ -146,35 +108,26 @@ def test_ttop_valid_tickers():
         "INTCX",
     ]
     for ticker in tickers:
-        sample_ord_params["ticker"] = ticker
+        monkeypatch.setitem(ORD_PARAMS, "ticker", ticker)
         assert (
             ttop.text_to_order_params("BTO " + ticker + " 50C 12/31 @0.45")
-            == sample_ord_params
+            == ORD_PARAMS
         )
 
 
-def test_ttop_BTO_STC_ticker():
+def test_ttop_BTO_STC_ticker(monkeypatch):
     """BTO and STC tickers return valid order parameters"""
-    sample_ord_params = {
-        "instruction": "BTO",
-        "ticker": "INTC",
-        "strike_price": "50",
-        "contract_type": "C",
-        "expiration": "12/31",
-        "contract_price": "0.45",
-        "comments": None,
-    }
     instructions = ["BTO", "STC"]
     tickers = ["BTO", "STC"]
     for instruction in instructions:
-        sample_ord_params["instruction"] = instruction
+        monkeypatch.setitem(ORD_PARAMS, "instruction", instruction)
         for ticker in tickers:
-            sample_ord_params["ticker"] = ticker
+            monkeypatch.setitem(ORD_PARAMS, "ticker", ticker)
             assert (
                 ttop.text_to_order_params(
                     instruction + " " + ticker + " 50C 12/31 @0.45"
                 )
-                == sample_ord_params
+                == ORD_PARAMS
             )
 
 
@@ -196,18 +149,9 @@ def test_ttop_invalid_tickers():
         assert ttop.text_to_order_params("BTO " + ticker + " 50C 12/31 @0.45") is None
 
 
-def test_ttop_valid_strike_price():
+def test_ttop_valid_strike_price(monkeypatch):
     """Valid strike prices of 1-5 digits
     possibly followed by 1-2 decimals return valid order parameters"""
-    sample_ord_params = {
-        "instruction": "BTO",
-        "ticker": "INTC",
-        "strike_price": "50",
-        "contract_type": "C",
-        "expiration": "12/31",
-        "contract_price": "0.45",
-        "comments": None,
-    }
     strike_prices = [
         "1",
         "12",
@@ -219,10 +163,10 @@ def test_ttop_valid_strike_price():
         "12345.67",
     ]
     for price in strike_prices:
-        sample_ord_params["strike_price"] = price
+        monkeypatch.setitem(ORD_PARAMS, "strike_price", price)
         assert (
             ttop.text_to_order_params("BTO INTC " + price + "C " "12/31 @0.45")
-            == sample_ord_params
+            == ORD_PARAMS
         )
 
 
@@ -246,23 +190,14 @@ def test_ttop_invalid_strike_price():
         )
 
 
-def test_ttop_valid_contract_type():
+def test_ttop_valid_contract_type(monkeypatch):
     """Valid contract type (C or P) returns valid order parameters"""
-    sample_ord_params = {
-        "instruction": "BTO",
-        "ticker": "INTC",
-        "strike_price": "50",
-        "contract_type": "C",
-        "expiration": "12/31",
-        "contract_price": "0.45",
-        "comments": None,
-    }
     valid_contract_types = ["C", "P"]
     for contract in valid_contract_types:
-        sample_ord_params["contract_type"] = contract
+        monkeypatch.setitem(ORD_PARAMS, "contract_type", contract)
         assert (
             ttop.text_to_order_params("BTO INTC 50" + contract + " 12/31 @0.45")
-            == sample_ord_params
+            == ORD_PARAMS
         )
 
 
@@ -286,28 +221,19 @@ def test_ttop_invalid_contract_type():
         )
 
 
-def test_ttop_valid_expiration():
+def test_ttop_valid_expiration(monkeypatch):
     """# Valid expiration of 1-2 digits/ 1-2 digits
     then optionally /2 or 4 digit returns valid order parameters"""
-    sample_ord_params = {
-        "instruction": "BTO",
-        "ticker": "INTC",
-        "strike_price": "50",
-        "contract_type": "C",
-        "expiration": "12/31",
-        "contract_price": "0.45",
-        "comments": None,
-    }
     valid_expirations = ["1/2", "1/12", "12/1", "12/12"]
     valid_years = ["", "/34", "/3456"]
     for expiration in valid_expirations:
         for year in valid_years:
-            sample_ord_params["expiration"] = expiration + year
+            monkeypatch.setitem(ORD_PARAMS, "expiration", expiration + year)
             assert (
                 ttop.text_to_order_params(
                     "BTO INTC 50C " + expiration + year + " @0.45"
                 )
-                == sample_ord_params
+                == ORD_PARAMS
             )
 
 
@@ -356,20 +282,11 @@ def test_ttop_invalid_expiration():
 
 def test_ttop_correct_at_syntax():
     """Contract price should come after @ with 0-1 spaces"""
-    sample_ord_params = {
-        "instruction": "BTO",
-        "ticker": "INTC",
-        "strike_price": "50",
-        "contract_type": "C",
-        "expiration": "12/31",
-        "contract_price": "0.45",
-        "comments": None,
-    }
     valid_at = ["@0.45", "@ 0.45"]
     for valid in valid_at:
         assert (
             ttop.text_to_order_params("BTO INTC 50C 12/31 " + valid)
-            == sample_ord_params
+            == ORD_PARAMS
         )
 
 
@@ -390,10 +307,10 @@ def test_ttop_wrong_at_syntax():
         assert ttop.text_to_order_params("BTO INTC 50C 12/31 " + invalid) is None
 
 
-def test_ttop_valid_contract_price():
+def test_ttop_valid_contract_price(monkeypatch):
     """Valid contract prices of 0-3 digits followed
     by one or two decimals return valid order parameters"""
-    sample_ord_params = {
+    ORD_PARAMS = {
         "instruction": "BTO",
         "ticker": "INTC",
         "strike_price": "50",
@@ -413,10 +330,10 @@ def test_ttop_valid_contract_price():
         "123.4",
     ]
     for price in valid_contract_prices:
-        sample_ord_params["contract_price"] = price
+        monkeypatch.setitem(ORD_PARAMS, "contract_price", price)
         assert (
             ttop.text_to_order_params("BTO INTC 50C 12/31 @" + price)
-            == sample_ord_params
+            == ORD_PARAMS
         )
 
 
