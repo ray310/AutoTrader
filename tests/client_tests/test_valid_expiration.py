@@ -2,17 +2,6 @@ import datetime
 import auto_trader_client.src.validate_params as vp
 
 
-ORD_PARAMS = {
-    "instruction": "BTO",
-    "ticker": "INTC",
-    "strike_price": "50.5",
-    "contract_type": "C",
-    "expiration": "12/31",
-    "contract_price": "0.45",
-    "comments": None,
-}
-
-
 def test_is_expiration_valid_good_dates(monkeypatch):
     """ Valid expiration dates return True"""
 
