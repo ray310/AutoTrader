@@ -48,11 +48,6 @@ def test_validate_params_extra_chars_instruction(monkeypatch):
     """Permutation of BTO and STC with an extra character return False"""
     import itertools
 
-    def mock_is_expiration_valid(expiration):
-        return True
-
-    monkeypatch.setattr(vp, "is_expiration_valid", mock_is_expiration_valid)
-
     # check for permutations of valid instruction and extra chars
     prefixes = ["BTO", "STC", "B", "C", "S", "T", "/"]
     extra_char_prefix = ["".join(x) for x in itertools.permutations(prefixes, 2)]
@@ -66,11 +61,6 @@ def test_validate_params_lower_case_instruction(monkeypatch):
     Combinations of letters in BTO and STC return False unless BTO and STC
     """
     import itertools
-
-    def mock_is_expiration_valid(expiration):
-        return True
-
-    monkeypatch.setattr(vp, "is_expiration_valid", mock_is_expiration_valid)
 
     valid_instructions = ["BTO", "STC"]
     letters = []
@@ -86,11 +76,6 @@ def test_validate_params_lower_case_instruction(monkeypatch):
 
 def test_validate_params_bad_instruction(monkeypatch):
     """Valid instruction should return True"""
-
-    def mock_is_expiration_valid(expiration):
-        return True
-
-    monkeypatch.setattr(vp, "is_expiration_valid", mock_is_expiration_valid)
     bad_instructions = [
         "",
         "/",
@@ -107,7 +92,7 @@ def test_validate_params_bad_instruction(monkeypatch):
         {},
         ["BTO"],
         ("BTO",),
-        {"BTO", "BTO"},
+        {"instruction", "BTO"},
     ]
     for bad in bad_instructions:
         monkeypatch.setitem(ORD_PARAMS, "instruction", bad)
@@ -129,11 +114,6 @@ def test_validate_params_good_tickers(monkeypatch):
 
 def test_validate_params_bad_tickers(monkeypatch):
     """Valid tickers should return True """
-
-    def mock_is_expiration_valid(expiration):
-        return True
-
-    monkeypatch.setattr(vp, "is_expiration_valid", mock_is_expiration_valid)
     tickers = [
         "",
         "a",
@@ -149,7 +129,7 @@ def test_validate_params_bad_tickers(monkeypatch):
         {},
         ["ABC"],
         ("ABC",),
-        {"ABC": "ABC"},
+        {"ticker": "ABC"},
     ]
     for tckr in tickers:
         monkeypatch.setitem(ORD_PARAMS, "ticker", tckr)
@@ -171,11 +151,6 @@ def test_validate_params_valid_strike(monkeypatch):
 
 def test_validate_params_bad_strike(monkeypatch):
     """Invalid strike price should return False"""
-
-    def mock_is_expiration_valid(expiration):
-        return True
-
-    monkeypatch.setattr(vp, "is_expiration_valid", mock_is_expiration_valid)
     bad_strike = [
         "",
         "-12",
@@ -195,7 +170,7 @@ def test_validate_params_bad_strike(monkeypatch):
         {},
         ["34"],
         ("34",),
-        {"34": "34"},
+        {"strike_price": "34"},
     ]
     for bad in bad_strike:
         monkeypatch.setitem(ORD_PARAMS, "strike_price", bad)
@@ -217,11 +192,6 @@ def test_validate_params_valid_contract_type(monkeypatch):
 
 def test_validate_params_bad_contract_type(monkeypatch):
     """Invalid contract type should return False"""
-
-    def mock_is_expiration_valid(expiration):
-        return True
-
-    monkeypatch.setattr(vp, "is_expiration_valid", mock_is_expiration_valid)
     bad_contract = [
         "",
         "c",
@@ -239,7 +209,7 @@ def test_validate_params_bad_contract_type(monkeypatch):
         {},
         ("C",),
         ["C"],
-        {"C": "C"},
+        {"contract_type": "C"},
     ]
     for bad in bad_contract:
         monkeypatch.setitem(ORD_PARAMS, "contract_type", bad)
@@ -272,11 +242,6 @@ def test_validate_params_valid_contract_price(monkeypatch):
 
 def test_validate_params_bad_contract_price(monkeypatch):
     """Invalid contract prices return False"""
-
-    def mock_is_expiration_valid(expiration):
-        return True
-
-    monkeypatch.setattr(vp, "is_expiration_valid", mock_is_expiration_valid)
     prices = [
         "",
         "1234",
@@ -293,7 +258,7 @@ def test_validate_params_bad_contract_price(monkeypatch):
         {},
         ("34",),
         ["34"],
-        {"34": "34"},
+        {"contract_price": "34"},
     ]
     for price in prices:
         monkeypatch.setitem(ORD_PARAMS, "contract_price", price)
