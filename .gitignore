@@ -4,4 +4,6 @@
 *.idea
 *.json
 *.exe
+*.coverage
+htmlcov/
 
