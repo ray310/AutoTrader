@@ -8,3 +8,4 @@ dependencies:
         - discord.py==1.6.0
         - google-cloud-storage==1.35.0
         - tda-api==1.1.1
+        - coverage==5.4

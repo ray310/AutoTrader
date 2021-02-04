@@ -3,13 +3,13 @@
 from auto_trader_server.src import text_to_order_params as ttop
 
 ORD_PARAMS = {
-        "instruction": "BTO",
-        "ticker": "INTC",
-        "strike_price": "50",
-        "contract_type": "C",
-        "expiration": "12/31",
-        "contract_price": "0.45",
-        "comments": None,
+    "instruction": "BTO",
+    "ticker": "INTC",
+    "strike_price": "50",
+    "contract_type": "C",
+    "expiration": "12/31",
+    "contract_price": "0.45",
+    "comments": None,
 }
 
 
@@ -31,10 +31,7 @@ def test_ttop_valid_signal():
 def test_ttop_embedded_signals(monkeypatch):
     """Valid signals embedded in text return valid order parameters"""
     monkeypatch.setitem(ORD_PARAMS, "comments", "comments ")
-    assert (
-        ttop.text_to_order_params("comments BTO INTC 50C 12/31 @0.45")
-        == ORD_PARAMS
-    )
+    assert ttop.text_to_order_params("comments BTO INTC 50C 12/31 @0.45") == ORD_PARAMS
 
     monkeypatch.setitem(ORD_PARAMS, "comments", "comments  comments")
     assert (
@@ -43,10 +40,7 @@ def test_ttop_embedded_signals(monkeypatch):
     )
 
     monkeypatch.setitem(ORD_PARAMS, "comments", "comments\n")
-    assert (
-        ttop.text_to_order_params("comments\nBTO INTC 50C 12/31 @0.45")
-        == ORD_PARAMS
-    )
+    assert ttop.text_to_order_params("comments\nBTO INTC 50C 12/31 @0.45") == ORD_PARAMS
 
     monkeypatch.setitem(ORD_PARAMS, "comments", "comments\n\ncomments")
     assert (
@@ -66,10 +60,7 @@ def test_ttop_valid_instruction(monkeypatch):
     valid_instructions = ["BTO", "STC"]
     for valid in valid_instructions:
         monkeypatch.setitem(ORD_PARAMS, "instruction", valid)
-        assert (
-            ttop.text_to_order_params(valid + " INTC 50C 12/31 @0.45")
-            == ORD_PARAMS
-        )
+        assert ttop.text_to_order_params(valid + " INTC 50C 12/31 @0.45") == ORD_PARAMS
 
 
 def test_ttop_invalid_instructions():
@@ -284,10 +275,7 @@ def test_ttop_correct_at_syntax():
     """Contract price should come after @ with 0-1 spaces"""
     valid_at = ["@0.45", "@ 0.45"]
     for valid in valid_at:
-        assert (
-            ttop.text_to_order_params("BTO INTC 50C 12/31 " + valid)
-            == ORD_PARAMS
-        )
+        assert ttop.text_to_order_params("BTO INTC 50C 12/31 " + valid) == ORD_PARAMS
 
 
 def test_ttop_wrong_at_syntax():
@@ -331,10 +319,7 @@ def test_ttop_valid_contract_price(monkeypatch):
     ]
     for price in valid_contract_prices:
         monkeypatch.setitem(ORD_PARAMS, "contract_price", price)
-        assert (
-            ttop.text_to_order_params("BTO INTC 50C 12/31 @" + price)
-            == ORD_PARAMS
-        )
+        assert ttop.text_to_order_params("BTO INTC 50C 12/31 @" + price) == ORD_PARAMS
 
 
 def test_ttop_invalid_contract_price():
