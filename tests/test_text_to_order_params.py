@@ -3,8 +3,8 @@
 from auto_trader_server.src import text_to_order_params as ttop
 
 
-#TODO: Remove NULL and create base object that can be mutated in pytest context
-#TODO: Remove cut and paste
+# TODO: Remove NULL and create base object that can be mutated in pytest context
+# TODO: Remove cut and paste
 NULL_ORD_PARAM = {
     "instruction": None,
     "ticker": None,
@@ -208,7 +208,16 @@ def test_ttop_valid_strike_price():
         "contract_price": "0.45",
         "comments": None,
     }
-    strike_prices = ["1", "12", "123", "1234", "1234.5", "1234.56", "12345.5", "12345.67"]
+    strike_prices = [
+        "1",
+        "12",
+        "123",
+        "1234",
+        "1234.5",
+        "1234.56",
+        "12345.5",
+        "12345.67",
+    ]
     for price in strike_prices:
         sample_ord_params["strike_price"] = price
         assert (
@@ -233,7 +242,7 @@ def test_ttop_invalid_strike_price():
     ]
     for price in strike_prices:
         assert (
-                ttop.text_to_order_params("BTO INTC " + price + "C " "12/31 @0.45") is None
+            ttop.text_to_order_params("BTO INTC " + price + "C " "12/31 @0.45") is None
         )
 
 
@@ -273,7 +282,7 @@ def test_ttop_invalid_contract_type():
     ]
     for contract in invalid_contract_types:
         assert (
-                ttop.text_to_order_params("BTO INTC 50" + contract + " 12/31 @0.45") is None
+            ttop.text_to_order_params("BTO INTC 50" + contract + " 12/31 @0.45") is None
         )
 
 
