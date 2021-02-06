@@ -29,7 +29,7 @@ def test_check_new_file_old_files():
         files = ["".join(["test", str(x), ".json"]) for x in range(num_files)]
         for f in files:
             pathlib.Path(os.path.join(tmp, f)).touch()
-        time.sleep(.001)
+        time.sleep(0.001)
         obj = om.OrderMonitor(tmp)
         print("killing time")
         assert obj._check_new_files() == []
@@ -78,15 +78,18 @@ def test_get_creation_time(monkeypatch):
 
         # POSIX systems
         monkeypatch.setattr(os, "name", "posix")
-        mtime = datetime.datetime.fromtimestamp(os.path.getmtime(tmp.name), tz=datetime.timezone.utc)
+        mtime = datetime.datetime.fromtimestamp(
+            os.path.getmtime(tmp.name), tz=datetime.timezone.utc
+        )
         obj = om.OrderMonitor(tempdir)
         dt = obj._get_creation_time(tempdir, tmp.name)
         assert dt == mtime
 
         # Windows Systems
         monkeypatch.setattr(os, "name", "nt")
-        ctime = datetime.datetime.fromtimestamp(os.path.getctime(tmp.name),
-                                                tz=datetime.timezone.utc)
+        ctime = datetime.datetime.fromtimestamp(
+            os.path.getctime(tmp.name), tz=datetime.timezone.utc
+        )
         obj = om.OrderMonitor(tempdir)
         dt = obj._get_creation_time(tempdir, tmp.name)
         assert dt == ctime
