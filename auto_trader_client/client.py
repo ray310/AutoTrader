@@ -1,13 +1,14 @@
 """Driver for auto_trader_client"""
 
+
 import src.client_utils as utils
 from src.client_settings import (
     ROOT_LOG,
     LOG_DIR,
     GCP_CREDS_PATH,
     DEFAULT_ORDER_DIR,
-    BUCKET_LOC,
-    BUCKET_KEY,
+    BUCKET_NAMES_PATH,
+    BUCKET_DICT_KEY,
 )
 import asyncio
 import json
@@ -27,8 +28,8 @@ async def main():
     utils.init_root_logger(ROOT_LOG, LOG_DIR)
 
     # get bucket name
-    with open(BUCKET_LOC) as fp:
-        bucket_name = json.load(fp)[BUCKET_KEY]
+    with open(BUCKET_NAMES_PATH) as fp:
+        bucket_name = json.load(fp)[BUCKET_DICT_KEY]
 
     # start workers
     await start_workers(bucket_name)
