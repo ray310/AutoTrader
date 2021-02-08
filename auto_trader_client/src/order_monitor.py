@@ -7,6 +7,7 @@ import json
 import asyncio
 import datetime
 import src.validate_params as vp
+import src.ameritrade_orders as am_ord
 
 
 class OrderMonitor:
@@ -69,9 +70,8 @@ class OrderMonitor:
     def _process_order(directory, filename):
         """Validate and attempt to place order"""
         with open(os.path.join(directory, filename)) as f:
-            order_params = json.load(filename)
+            order_params = json.load(f)
         is_valid = vp.validate_params(order_params)
         if is_valid:
             valid_params = vp.reformat_params(order_params)
-            # td.generate_order(valid_params)"""  # TODO: implement
-        print(f"{filename} processed")
+            am_ord.initialize_order(valid_params)
