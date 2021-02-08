@@ -1,13 +1,9 @@
 import os
-import sys
 import tempfile
 import time
 import datetime
 import pytest
 import pathlib
-
-os.chdir("auto_trader_client")
-sys.path.append(os.getcwd())
 import auto_trader_client.src.order_monitor as om
 
 

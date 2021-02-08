@@ -3,13 +3,14 @@ import pytest
 import auto_trader_client.src.validate_params as vp
 from datetime import datetime
 
+
 ORD_PARAMS = {
     "instruction": "BTO",
     "ticker": "INTC",
     "strike_price": "50.5",
     "contract_type": "C",
     "expiration": "12/31",
-    "contract_price": "0.45",
+    "contract_price": 0.45,
     "comments": None,
 }
 
