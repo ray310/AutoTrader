@@ -22,7 +22,7 @@ class ListenerBot(commands.Bot):
 
     async def on_message(self, message, author=None):
         logging.info(message.content)
-        order_params = ttop.text_to_order_string(message.content)
+        order_params = ttop.text_to_order_params(message.content)
         logging.info(f"Order Parameters: {order_params} ")
         if order_params is not None:
             dt_stamp = datetime.datetime.strftime(
@@ -30,6 +30,4 @@ class ListenerBot(commands.Bot):
             )
             blob_name = order_params["ticker"] + dt_stamp + ".json"
             logging.info("Sending order parameters to bucket")
-            utils.upload_string_as_gcp_blob(
-                self.storage_bucket, str(order_params), blob_name
-            )
+            utils.upload_as_gcp_blob(self.storage_bucket, order_params, blob_name)
