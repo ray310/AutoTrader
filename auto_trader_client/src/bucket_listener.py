@@ -27,7 +27,7 @@ class BucketListener:
 
     def _get_newest(self):
         blob_iter = self._client.list_blobs(self._bucket_name)
-        recent = self._updated - datetime.timedelta(seconds=10)
+        recent = self._updated - datetime.timedelta(seconds=5)
         for blob in blob_iter:
             if blob.time_created > recent:
                 file_name = os.path.join(self._local_directory, blob.name)
