@@ -1,5 +1,5 @@
 import logging
-import time
+import datetime
 from discord.ext import commands
 import src.gcp_utils as utils
 import src.text_to_order_params as ttop
@@ -24,8 +24,8 @@ class ListenerBot(commands.Bot):
         logging.info(message.content)
         order_params = ttop.text_to_order_string(message.content)
         logging.info(f"Order Parameters: {order_params} ")
-        if order_params:
-            dt_stamp = time.strftime("%d-%b-%y_%H:%M:%S", time.gmtime())
+        if order_params is not None:
+            dt_stamp = datetime.datetime.strftime(datetime.datetime.now(datetime.timezone.utc), "%d-%b-%y_%H_%M_%S")
             blob_name = order_params["ticker"] + dt_stamp + ".json"
             logging.info("Sending order parameters to bucket")
             utils.upload_string_as_gcp_blob(
