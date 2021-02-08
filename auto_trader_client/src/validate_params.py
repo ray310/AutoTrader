@@ -89,6 +89,8 @@ def reformat_params(order_params):
     else:
         raise ValueError(f"Strike price is {strike}; an illegal value")
 
+    order_params["contract_price"] = float(order_params["contract_price"])
+
     # convert expiration string to datetime object for tda package
     order_params["expiration"] = expiration_str_to_datetime(order_params["expiration"])
     return order_params
