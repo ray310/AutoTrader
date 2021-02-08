@@ -11,9 +11,10 @@ BUCKET_DICT_KEY = "storage_bucket"  # key to access bucket located at BUCKET_INF
 DEFAULT_ORDER_DIR = "signals"
 
 # Order settings
-ORDER_SETTINGS_FILE = "config/order_guidelines.json"
-SL_PERCENT_KEY = "SL_percentage"
-ORDER_VAL_KEY = "order_value"
+ORD_SETTINGS_PATH = "config/order_guidelines.json"
+ORD_VAL_KEY = "order_value"
+BUY_LIM_KEY = "buy_limit_percent"
+SL_KEY = "SL_percentage"
 
 # TD Ameritrade
 TD_TOKEN_PATH = "config/tda_token.json"
