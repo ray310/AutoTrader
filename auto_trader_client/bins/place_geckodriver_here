@@ -1,4 +1,4 @@
-Download geckodriver.exe and place it here.
+Download geckodriver.exe and place it in auto_trader_client/bins directory
 
 Geckodriver Download and Info:
 https://github.com/mozilla/geckodriver/releases
