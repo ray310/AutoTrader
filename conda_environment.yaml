@@ -9,3 +9,4 @@ dependencies:
         - google-cloud-storage==1.35.0
         - tda-api==1.1.1
         - coverage==5.4
+        - selenium==3.141.0
