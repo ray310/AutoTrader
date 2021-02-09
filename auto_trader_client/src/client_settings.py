@@ -3,7 +3,7 @@ ROOT_LOG = "at_client.log"
 LOG_DIR = "logs"
 
 # Google Cloud Platform
-GCP_CREDS_PATH = "config/google_service_account.env"
+GCP_CREDS_PATH = "config/google_service_account.json"
 BUCKET_NAMES_PATH = "config/storage_bucket.json"
 BUCKET_DICT_KEY = "storage_bucket"  # key to access bucket located at BUCKET_INFO_LOC
 
