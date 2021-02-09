@@ -30,7 +30,7 @@ def initialize_order(ord_params):
 
     with open(ORD_SETTINGS_PATH) as fp:
         order_settings = json.load(fp)
-    ord_value = order_settings[ORD_VAL_KEY]
+    ord_value = order_settings[ORD_VAL_KEY]  # dollar value of order e.g. 500.00
     buy_limit_percent = order_settings[BUY_LIM_KEY]
     stop_loss_percent = order_settings[SL_KEY]
 
