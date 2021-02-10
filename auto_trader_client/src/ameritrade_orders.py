@@ -30,7 +30,7 @@ def initialize_order(ord_params):
 
     with open(ORD_SETTINGS_PATH) as fp:
         order_settings = json.load(fp)
-    ord_value = order_settings[ORD_VAL_KEY]  # dollar value of order e.g. 500.00
+    max_ord_value = order_settings[ORD_VAL_KEY]  # max dollar value of order e.g. 500.00
     buy_limit_percent = order_settings[BUY_LIM_KEY]
     stop_loss_percent = order_settings[SL_KEY]
 
@@ -39,15 +39,23 @@ def initialize_order(ord_params):
 
     # generate and place order
     if ord_params["instruction"] == "BTO":
-        ota_order = generate_bto_order(
-            ord_params, ord_value, buy_limit_percent, stop_loss_percent
+        ota_order = build_bto_order_w_stop_loss(
+            ord_params, max_ord_value, buy_limit_percent, stop_loss_percent
         )
-        # place order. order_spec takes OrderBuilder obj
         response = client.place_order(acct_num, order_spec=ota_order)
         logging.info(response)
     elif ord_params["instruction"] == "STC":
-        stc = generate_stc_order(client, acct_num, ord_params)
-        if stc is not None:
+        symbol = build_option_symbol(ord_params)
+        position_qty = get_position_quant(client, acct_num, symbol)
+        if position_qty > 0:
+            existing_stc_ids = get_existing_stc_orders(client, acct_num, symbol)
+            if len(existing_stc_ids) > 0:
+                for ord_id in existing_stc_ids:
+                    response = client.cancel_order(ord_id, acct_num)
+                    logging.info(response)
+            # TODO: Future feature: If sell_half flag then
+            #  stc_market half and stc_stop_market other half
+            stc = build_stc_market_order(ord_params, position_qty)
             response = client.place_order(acct_num, order_spec=stc)
             logging.info(response)
     else:
@@ -79,13 +87,15 @@ def authenticate_tda_account(token_path: str, api_key: str, redirect_uri: str):
     return client
 
 
-def generate_bto_order(
-    ord_params: dict, ord_val: float, limit_percent: float, stop_loss_percent: float
+def build_bto_order_w_stop_loss(
+    ord_params: dict, max_ord_val: float, limit_percent: float, stop_loss_percent: float
 ):
-    """ Prepares and returns one-trigger another order
-    with BTO limit and STC stop-market"""
+    """Prepares and returns OrderBuilder object for one-trigger another order.
+    First order is BTO limit and second order is STC stop-market"""
     # prepare BTO inputs
-    qty = calc_order_quantity(ord_params["contract_price"], ord_val, limit_percent)
+    qty = calc_buy_order_quantity(
+        ord_params["contract_price"], max_ord_val, limit_percent
+    )
     buy_lim_price = round(ord_params["contract_price"] * (1 + limit_percent), 2)
     stop_loss_price = round(ord_params["contract_price"] * (1 - stop_loss_percent), 2)
     option_symbol = build_option_symbol(ord_params)
@@ -101,24 +111,20 @@ def generate_bto_order(
     return one_trigger_other
 
 
-def generate_stc_order(client, acct_id: str, ord_params: dict):
-    """ Returns STC market order is there is a long position for the given option,
-    else returns None"""
+def build_stc_market_order(ord_params: dict, pos_qty: float):
+    """ Returns STC market order OrderBuilder obj"""
     option_symbol = build_option_symbol(ord_params)
-    qty = get_position_quant(client, acct_id, option_symbol)
-    if qty > 0:
-        stc = tda.orders.options.option_sell_to_close_market(option_symbol, qty)
-        return stc
-    else:
-        return None
+    stc = tda.orders.options.option_sell_to_close_market(option_symbol, pos_qty)
+    return stc
 
 
-def calc_order_quantity(
-    price: float, ord_val: float, limit_percent: float, lot_size=100
+def calc_buy_order_quantity(
+    price: float, max_ord_val: float, limit_percent: float, lot_size=100
 ):
-    """Return the order quantity """
+    """Returns the order quantity for a buy order based on
+    the option price, maximum order size, and buy limit percent  """
     lot_value = price * lot_size * (1 + limit_percent)
-    quantity = int(ord_val / lot_value)  # int() rounds down
+    quantity = int(max_ord_val / lot_value)  # int() rounds down
     return quantity
 
 
@@ -160,3 +166,22 @@ def get_position_quant(client, acct_id: str, symbol: str):
         if position["instrument"]["symbol"] == symbol:
             quantity = position["longQuantity"]
     return float(quantity)
+
+
+def get_existing_stc_orders(client, acct_id: str, symbol_to_match: str):
+    """Returns a list of existing single-leg STC orders for the given symbol.
+    This library is not currently designed to work with multi-leg (complex) orders"""
+    response = client.get_account(
+        acct_id, fields=tda.client.Client.Account.Fields.ORDERS
+    )
+    summary = json.loads(response.content)
+    order_ids = []
+    orders = summary["securitiesAccount"]["orderStrategies"]
+    for order in orders:
+        if order["status"] == "WORKING":  # only examine existing orders
+            if len(order["orderLegCollection"]) == 1:  # no multi-leg orders
+                instruct = order["orderLegCollection"][0]["instruction"]
+                symbol = order["orderLegCollection"][0]["instrument"]["symbol"]
+                if instruct == "SELL_TO_CLOSE" and symbol == symbol_to_match:
+                    order_ids.append(str(order["orderId"]))
+    return order_ids
