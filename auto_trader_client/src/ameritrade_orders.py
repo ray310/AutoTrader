@@ -111,7 +111,7 @@ def authenticate_tda_account(token_path: str, api_key: str, redirect_uri: str):
     return client
 
 
-def build_bto_order_w_stop_loss(  # TODO: FIx, now takes quant
+def build_bto_order_w_stop_loss(
     ord_params: dict, qty: int, limit_percent: float, stop_loss_percent: float
 ):
     """Prepares and returns OrderBuilder object for one-trigger another order.
