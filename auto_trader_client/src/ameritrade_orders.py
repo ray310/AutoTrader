@@ -214,17 +214,39 @@ def validate_user_settings(usr_settings: dict):
 
     try:
         for key, val in usr_settings.items():
+            assert not isinstance(val, bool)
             assert isinstance(val, float) or isinstance(val, int)
     except AssertionError:
-        msg = f"{val}: is an illegal value. Check configuration values. "
+        msg = f"Illegal value type. Check configuration values"
         raise TypeError(msg) from None
 
     try:
-        assert usr_settings["max_ord_val"] > 0
+        for key, val in usr_settings.items():
+            if key == "max_ord_val":
+                assert val > 0
+            elif key == "SL_percent":
+                assert 0 <= val < 1
+            else:
+                assert val >= 0
     except AssertionError:
-        msg = "Maximum order value is 0. Please enter a non-zero value"
+        msg = "Please check order guideline values"
         raise ValueError(msg) from None
+
     if usr_settings["max_ord_val"] < 500:
         msg1 = "Maximum order value is less than $500.\n"
-        msg2 = "This is too small for some orders and may result in failure to purchase\n\n"
+        msg2 = (
+            "This is too small for some orders and may result in failure to purchase\n"
+        )
         sys.stderr.write(msg1 + msg2)
+
+    if usr_settings["buy_limit_percent"] >= 0.20:
+        msg = f"Buy limit is {usr_settings['buy_limit_percent']}. Is that too risky?\n"
+        sys.stderr.write(msg)
+
+    if usr_settings["SL_percent"] >= 0.30:
+        msg = f"SL percent is {usr_settings['SL_percent']}. Is that too risky?\n"
+        sys.stderr.write(msg)
+
+    if usr_settings["SL_percent"] <= 0.10:
+        msg = f"SL percent is {usr_settings['SL_percent']}. Is that too low?\n"
+        sys.stderr.write(msg)
