@@ -1,5 +1,6 @@
 """Functions needed to execute TD Ameritrade orders"""
 
+import sys
 import tda
 import tda.orders.options
 import json
@@ -22,41 +23,64 @@ def initialize_order(ord_params):
     authenticate with TDA site and place order"""
 
     # initialize values
+    td_acct = {}
     with open(TD_AUTH_PARAMS_PATH) as fp:
         td_auth_params = json.load(fp)
-    uri = td_auth_params[TD_DICT_KEY_URI]
-    api_key = td_auth_params[TD_DICT_KEY_API]
-    acct_num = td_auth_params[TD_DICT_KEY_ACCT]
+    td_acct["uri"] = td_auth_params[TD_DICT_KEY_URI]
+    td_acct["api_key"] = td_auth_params[TD_DICT_KEY_API]
+    td_acct["acct_num"] = td_auth_params[TD_DICT_KEY_ACCT]
 
     with open(ORD_SETTINGS_PATH) as fp:
         order_settings = json.load(fp)
-    max_ord_value = order_settings[ORD_VAL_KEY]  # max dollar value of order e.g. 500.00
-    buy_limit_percent = order_settings[BUY_LIM_KEY]
-    stop_loss_percent = order_settings[SL_KEY]
+    usr_set = {
+        "max_ord_val": order_settings[ORD_VAL_KEY],  # max $ value of order e.g. 500.00
+        "buy_limit_percent": order_settings[BUY_LIM_KEY],
+        "SL_percent": order_settings[SL_KEY],
+    }
+
+    # check user inputs
+    validate_user_settings(usr_set)
 
     # authenticate
-    client = authenticate_tda_account(TD_TOKEN_PATH, api_key, uri)
+    client = authenticate_tda_account(TD_TOKEN_PATH, td_acct["api_key"], td_acct["uri"])
 
     # generate and place order
     if ord_params["instruction"] == "BTO":
-        ota_order = build_bto_order_w_stop_loss(
-            ord_params, max_ord_value, buy_limit_percent, stop_loss_percent
+        buy_qty = calc_buy_order_quantity(
+            ord_params["contract_price"],
+            usr_set["max_ord_val"],
+            usr_set["buy_limit_percent"],
         )
-        response = client.place_order(acct_num, order_spec=ota_order)
-        logging.info(response)
+        if buy_qty >= 1:
+            ota_order = build_bto_order_w_stop_loss(
+                ord_params,
+                buy_qty,
+                usr_set["buy_limit_percent"],
+                usr_set["SL_percent"],
+            )
+            response = client.place_order(td_acct["acct_num"], order_spec=ota_order)
+            logging.info(response)
+        else:
+            msg1 = f"{ord_params} purchase quantity is 0\n"
+            msg2 = (
+                "This may be due to a low max order value or high buy limit percent\n\n"
+            )
+            sys.stderr.write(msg1 + msg2)
     elif ord_params["instruction"] == "STC":
         symbol = build_option_symbol(ord_params)
-        position_qty = get_position_quant(client, acct_num, symbol)
-        if position_qty > 0:
-            existing_stc_ids = get_existing_stc_orders(client, acct_num, symbol)
+        position_qty = get_position_quant(client, td_acct["acct_num"], symbol)
+        if position_qty >= 1:
+            existing_stc_ids = get_existing_stc_orders(
+                client, td_acct["acct_num"], symbol
+            )
             if len(existing_stc_ids) > 0:
                 for ord_id in existing_stc_ids:
-                    response = client.cancel_order(ord_id, acct_num)
+                    response = client.cancel_order(ord_id, td_acct["acct_num"])
                     logging.info(response)
             # TODO: Future feature: If sell_half flag then
             #  stc_market half and stc_stop_market other half
             stc = build_stc_market_order(ord_params, position_qty)
-            response = client.place_order(acct_num, order_spec=stc)
+            response = client.place_order(td_acct["acct_num"], order_spec=stc)
             logging.info(response)
     else:
         instr = ord_params["instruction"]
@@ -88,14 +112,12 @@ def authenticate_tda_account(token_path: str, api_key: str, redirect_uri: str):
 
 
 def build_bto_order_w_stop_loss(
-    ord_params: dict, max_ord_val: float, limit_percent: float, stop_loss_percent: float
+    ord_params: dict, qty: int, limit_percent: float, stop_loss_percent: float
 ):
     """Prepares and returns OrderBuilder object for one-trigger another order.
     First order is BTO limit and second order is STC stop-market"""
+
     # prepare BTO inputs
-    qty = calc_buy_order_quantity(
-        ord_params["contract_price"], max_ord_val, limit_percent
-    )
     buy_lim_price = round(ord_params["contract_price"] * (1 + limit_percent), 2)
     stop_loss_price = round(ord_params["contract_price"] * (1 - stop_loss_percent), 2)
     option_symbol = build_option_symbol(ord_params)
@@ -121,11 +143,11 @@ def build_stc_market_order(ord_params: dict, pos_qty: float):
 def calc_buy_order_quantity(
     price: float, max_ord_val: float, limit_percent: float, lot_size=100
 ):
-    """Returns the order quantity for a buy order based on
+    """Returns the order quantity (int) for a buy order based on
     the option price, maximum order size, and buy limit percent  """
     lot_value = price * lot_size * (1 + limit_percent)
-    quantity = int(max_ord_val / lot_value)  # int() rounds down
-    return quantity
+    quantity = max_ord_val / lot_value
+    return int(quantity)  # int() rounds down
 
 
 def build_option_symbol(ord_params: dict):
@@ -185,3 +207,46 @@ def get_existing_stc_orders(client, acct_id: str, symbol_to_match: str):
                 if instruct == "SELL_TO_CLOSE" and symbol == symbol_to_match:
                     order_ids.append(str(order["orderId"]))
     return order_ids
+
+
+def validate_user_settings(usr_settings: dict):
+    """Raises an error for invalid inputs or sends a warning message to std.err"""
+
+    try:
+        for key, val in usr_settings.items():
+            assert not isinstance(val, bool)
+            assert isinstance(val, float) or isinstance(val, int)
+    except AssertionError:
+        msg = f"Illegal value type. Check configuration values"
+        raise TypeError(msg) from None
+
+    try:
+        for key, val in usr_settings.items():
+            if key == "max_ord_val":
+                assert val > 0
+            elif key == "SL_percent":
+                assert 0 <= val < 1
+            else:
+                assert val >= 0
+    except AssertionError:
+        msg = "Please check order guideline values"
+        raise ValueError(msg) from None
+
+    if usr_settings["max_ord_val"] < 500:
+        msg1 = "Maximum order value is less than $500.\n"
+        msg2 = (
+            "This is too small for some orders and may result in failure to purchase\n"
+        )
+        sys.stderr.write(msg1 + msg2)
+
+    if usr_settings["buy_limit_percent"] >= 0.20:
+        msg = f"Buy limit is {usr_settings['buy_limit_percent']}. Is that too risky?\n"
+        sys.stderr.write(msg)
+
+    if usr_settings["SL_percent"] >= 0.30:
+        msg = f"SL percent is {usr_settings['SL_percent']}. Is that too risky?\n"
+        sys.stderr.write(msg)
+
+    if usr_settings["SL_percent"] <= 0.10:
+        msg = f"SL percent is {usr_settings['SL_percent']}. Is that too low?\n"
+        sys.stderr.write(msg)
