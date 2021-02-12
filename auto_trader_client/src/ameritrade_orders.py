@@ -87,7 +87,7 @@ def initialize_order(ord_params):
         logging.warning(f"Invalid order instruction: {instr}")
 
 
-# creating more than one client_tests will likely cause issues with authentication
+# creating more than one client will likely cause issues with authentication
 def authenticate_tda_account(token_path: str, api_key: str, redirect_uri: str):
     """Takes TDA app key and path to locally stored auth token and tries to authenticate.
     If unable to authenticate with token, performs backup authentication
@@ -140,11 +140,10 @@ def build_stc_market_order(ord_params: dict, pos_qty: float):
     return stc
 
 
-def calc_buy_order_quantity(
-    price: float, max_ord_val: float, limit_percent: float, lot_size=100
-):
+def calc_buy_order_quantity(price: float, max_ord_val: float, limit_percent: float):
     """Returns the order quantity (int) for a buy order based on
     the option price, maximum order size, and buy limit percent  """
+    lot_size = 100  # standard lot size value
     lot_value = price * lot_size * (1 + limit_percent)
     quantity = max_ord_val / lot_value
     return int(quantity)  # int() rounds down
@@ -200,7 +199,8 @@ def get_existing_stc_orders(client, acct_id: str, symbol_to_match: str):
     order_ids = []
     orders = summary["securitiesAccount"]["orderStrategies"]
     for order in orders:
-        if order["status"] == "WORKING":  # only examine existing orders
+        # examine active orders
+        if order["status"] == "WORKING" or order["status"] == "QUEUED":
             if len(order["orderLegCollection"]) == 1:  # no multi-leg orders
                 instruct = order["orderLegCollection"][0]["instruction"]
                 symbol = order["orderLegCollection"][0]["instrument"]["symbol"]
