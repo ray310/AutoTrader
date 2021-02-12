@@ -2,7 +2,7 @@
 
 
 # TODO: this is copied from server_utils. Consolidate function to one location
-def init_root_logger(log_filename, log_directory="logs", log_level=10):
+def init_root_logger(log_filename, log_directory="logs", log_level=20):
     """Starts logger at specified location with specified formatting"""
     import logging
     import os
