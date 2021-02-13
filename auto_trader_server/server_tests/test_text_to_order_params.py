@@ -1,6 +1,5 @@
 """ Testing text_to_order_params.py function"""
-
-from auto_trader_server.src import text_to_order_params as ttop
+import src.text_to_order_params as ttop
 
 ORD_PARAMS = {
     "instruction": "BTO",
@@ -28,23 +27,39 @@ def test_ttop_valid_signal():
     assert ttop.text_to_order_params("BTO INTC 50C 12/31 @0.45") == ORD_PARAMS
 
 
-def test_ttop_embedded_signals(monkeypatch):
-    """Valid signals embedded in text return valid order parameters"""
-    monkeypatch.setitem(ORD_PARAMS, "comments", "comments ")
+def test_ttop_signal_after_comment(monkeypatch):
+    """Comments before signal are not captured"""
     assert ttop.text_to_order_params("comments BTO INTC 50C 12/31 @0.45") == ORD_PARAMS
+    assert ttop.text_to_order_params("comments\nBTO INTC 50C 12/31 @0.45") == ORD_PARAMS
 
-    monkeypatch.setitem(ORD_PARAMS, "comments", "comments  comments")
+
+def test_ttop_embedded_signals(monkeypatch):
+    """Only text after signal should be captured"""
+    monkeypatch.setitem(ORD_PARAMS, "comments", " comments")
     assert (
         ttop.text_to_order_params("comments BTO INTC 50C 12/31 @0.45 comments")
         == ORD_PARAMS
     )
-
-    monkeypatch.setitem(ORD_PARAMS, "comments", "comments\n")
-    assert ttop.text_to_order_params("comments\nBTO INTC 50C 12/31 @0.45") == ORD_PARAMS
-
-    monkeypatch.setitem(ORD_PARAMS, "comments", "comments\n\ncomments")
+    monkeypatch.setitem(ORD_PARAMS, "comments", "\ncomments")
     assert (
         ttop.text_to_order_params("comments\nBTO INTC 50C 12/31 @0.45\ncomments")
+        == ORD_PARAMS
+    )
+
+def test_ttop_only_parentheses_comment(monkeypatch):
+    """Valid signal must either be followed by a space or open parentheses"""
+    invalids = ["SL", "5", "[", "'", ",", ".", "!", "?", ")", "@", "%"]
+    for invalid in invalids:
+        assert ttop.text_to_order_params("BTO INTC 50C 12/31 @0.45" + invalid) is None
+
+    monkeypatch.setitem(ORD_PARAMS, "comments", "(SL @.35)")
+    assert (
+        ttop.text_to_order_params("BTO INTC 50C 12/31 @0.45(SL @.35)")
+        == ORD_PARAMS
+    )
+    monkeypatch.setitem(ORD_PARAMS, "comments", " (SL @.35)")
+    assert (
+        ttop.text_to_order_params("BTO INTC 50C 12/31 @0.45 (SL @.35)")
         == ORD_PARAMS
     )
 
@@ -271,6 +286,10 @@ def test_ttop_invalid_expiration():
             )
 
 
+#def test_expiration_with_markdown():
+    """Allow otherwise correct"""
+
+
 def test_ttop_correct_at_syntax():
     """Contract price should come after @ with 0-1 spaces"""
     valid_at = ["@0.45", "@ 0.45"]
@@ -339,7 +358,6 @@ def test_ttop_invalid_contract_price():
         "12345.12",
         "12.12A",
         "1A.12",
-        "12.34/",
     ]
     for price in invalid_contract_prices:
         assert ttop.text_to_order_params("BTO INTC 50C 12/31 @" + price) is None

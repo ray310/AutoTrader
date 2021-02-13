@@ -15,7 +15,7 @@ def text_to_order_params(string):
     # Regex Formatting
     # () denote regex groupings. Regex 'or' uses short-circuit evaluation
     # (?<!\S) is negative lookbehind assertion for any non-whitespace character
-    # BTO/STC cannot be preceded by any word character
+    # BTO/STC cannot be preceded by any non-whitespace character
     instruction = "((?<!\S)BTO|(?<!\S)STC)"
     ticker_pattern = "([A-Z]{1,5})"  # 1-5 capitalized letters
 
@@ -25,11 +25,14 @@ def text_to_order_params(string):
 
     # can be month/day/year(2 or 4 digit year) or month/day
     # month and day can be 1-2 digits
+    # regex tries to match patterns from left to right with or ( | ) operator
     expiration_date = "([0-9]{1,2}/[0-9]{1,2}/[0-9]{4}|[0-9]{1,2}/[0-9]{1,2}/[0-9]{2}|[0-9]{1,2}/[0-9]{1,2})"
 
-    # (?!\S) is negative lookahead assertion for any non-whitespace character
-    # up to 3 digit number followed by 1-2 decimals
-    contract_price = "([0-9]{0,3}\.[0-9]{1,2}(?!\S))"
+    # (?!\S) is negative lookahead assertion for any non-whitespace
+    # (?=[(]) is positive lookahead assertion for open parentheses
+    # contract price is up to 3 digit number followed by 1-2 decimals
+    # and either no non-whitespace or an open parentheses
+    contract_price = "([0-9]{0,3}\.[0-9]{1,2}((?!\S)|(?=[(])))"
     space = "\s{1,2}"  # 1-2 spaces
     at = "@\s{0,1}"  # @ followed by 0-1 spaces
     regex_pattern = (
@@ -71,7 +74,7 @@ def text_to_order_params(string):
         order_params["expiration"] = match.group(5)
         order_params["contract_price"] = match.group(6)
         start, end = match.span()
-        comments = string[0:start] + string[end:]
+        comments = string[end:]
         if comments != "":
             order_params["comments"] = comments
     else:
