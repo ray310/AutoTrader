@@ -108,3 +108,10 @@ def parse_sl(comments: str):
         match.groups()
         parsed = match.group(2)
     return parsed
+
+
+def strip_markdown(string: str):
+    """Removes underscores and asterisks"""
+    clean_str = string.replace("*", "")
+    clean_str = clean_str.replace("_", "")
+    return clean_str

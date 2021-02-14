@@ -349,7 +349,7 @@ def test_ttop_invalid_contract_price():
         assert ttop.text_to_order_params("BTO INTC 50C 12/31 @" + price) is None
 
 
-def test_ttop_bto(monkeypatch):
+def test_ttop_bto_sl(monkeypatch):
     """SL price is parsed from BTO order"""
     temp_flag = {"SL": ".35", "risk_level": None, "reduce": None}
     monkeypatch.setitem(ORD_PARAMS, "flags", temp_flag)
@@ -403,3 +403,9 @@ def test_parse_sl_invalid(monkeypatch):
 
             monkeypatch.setitem(ORD_PARAMS, "comments", comment)
             assert ttop.parse_sl(ORD_PARAMS["comments"]) is None
+
+
+def test_strip_markdown():
+    """Should remove underscores and asterisks"""
+    test_str = "***___***te*_st***___***"
+    assert ttop.strip_markdown(test_str) == "test"
