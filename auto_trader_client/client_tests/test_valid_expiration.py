@@ -1,7 +1,7 @@
 """Testing the expiration validation functions"""
 
 import datetime
-import auto_trader_client.src.validate_params as vp
+import src.validate_params as vp
 
 
 def test_is_expiration_valid_good_dates(monkeypatch):

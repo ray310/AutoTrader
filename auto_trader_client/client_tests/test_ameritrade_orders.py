@@ -2,7 +2,7 @@
 import pytest
 import datetime
 import tda
-import auto_trader_client.src.ameritrade_orders as am
+import src.ameritrade_orders as am
 
 VALID_ORD = {
     "instruction": "BTO",

@@ -4,7 +4,7 @@ import time
 import datetime
 import pytest
 import pathlib
-import auto_trader_client.src.order_monitor as om
+import src.order_monitor as om
 
 
 def test_check_new_file_valid_file():
