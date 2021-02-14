@@ -110,6 +110,22 @@ def parse_sl(comments: str):
     return parsed
 
 
+def parse_risk(comments: str):
+    """Parses tests for key terms indicating high risk. Returns "high risk" if terms are
+    found, else returns None. Key terms must not have alphanumeric character before or
+    after term"""
+    parsed = None
+    pattern = "(?<!\w)((risky)|(daytrade)|(small\sposition)|(light\sposition))(?!\w)"
+    match = re.search(pattern, comments, flags=re.IGNORECASE)
+    if match:
+        parsed = "high risk"
+    return parsed
+
+
+def parse_reduce(comments: str):
+    pass
+
+
 def strip_markdown(string: str):
     """Removes underscores and asterisks"""
     clean_str = string.replace("*", "")
