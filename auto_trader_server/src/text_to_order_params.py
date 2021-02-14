@@ -1,7 +1,9 @@
 """ Takes text data and parses it for specified pattern to generate order parameters """
+import logging
+import re
 
 
-def text_to_order_params(string):
+def text_to_order_params(string: str):
     """ Parses string for signal. If string contains one and only one order signal,
     then it returns the order parameters as strings and any additional comments,
     else returns None
@@ -9,9 +11,6 @@ def text_to_order_params(string):
         'STC INTC 50C 12/31 @.45'
         <Open/close> <ticker> <strike price + call or put> <expiration date> <@ price>
     """
-    import logging
-    import re
-
     # Regex Formatting
     # () denote regex groupings. Regex 'or' uses short-circuit evaluation
     # (?<!\S) is negative lookbehind assertion for any non-whitespace character
@@ -58,6 +57,7 @@ def text_to_order_params(string):
         "expiration": None,
         "contract_price": None,
         "comments": None,
+        "flags": {"SL": None, "risk_level": None, "reduce": None},
     }
 
     # Text should contain one and only one order signal
@@ -77,6 +77,8 @@ def text_to_order_params(string):
         comments = string[end:]
         if comments != "":
             order_params["comments"] = comments
+            if order_params["instruction"] == "BTO":
+                order_params["flags"]["SL"] = parse_sl(order_params["comments"])
     else:
         logging.warning("Two or matches detected in string")
 
@@ -88,7 +90,21 @@ def text_to_order_params(string):
         "expiration": None,
         "contract_price": None,
         "comments": None,
+        "flags": {"SL": None, "risk_level": None, "reduce": None},
     }:
         return None
     else:
         return order_params
+
+
+def parse_sl(comments: str):
+    """Parses comments for SL on an order"""
+    parsed = None
+    sl_at = "(SL\s{0,1}@\s{0,1})"
+    sl_price = "([0-9]{0,3}\.[0-9]{1,2}((?!\S)|(?=[)])))"
+    pattern = sl_at + sl_price
+    match = re.search(pattern, comments)
+    if match:
+        match.groups()
+        parsed = match.group(2)
+    return parsed
