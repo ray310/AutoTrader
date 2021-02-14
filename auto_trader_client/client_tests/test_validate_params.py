@@ -1,4 +1,4 @@
-import auto_trader_client.src.validate_params as vp
+import src.validate_params as vp
 
 ORD_PARAMS = {
     "instruction": "BTO",

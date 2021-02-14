@@ -123,7 +123,14 @@ def parse_risk(comments: str):
 
 
 def parse_reduce(comments: str):
-    pass
+    """Parses text for signal to reduce position by XX%.
+    Returns XX% as a string if found, else returns None"""
+    parsed = None
+    pattern = "(?<!\w)(closing|trim)(\s)([0-9]{1,3}%)(?!\w)"
+    match = re.search(pattern, comments, flags=re.IGNORECASE)
+    if match:
+        parsed = match.group(3)
+    return parsed
 
 
 def strip_markdown(string: str):

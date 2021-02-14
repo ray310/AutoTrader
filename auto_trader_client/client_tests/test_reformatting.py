@@ -1,6 +1,6 @@
 """Testing the reformatting functions"""
 import pytest
-import auto_trader_client.src.validate_params as vp
+import src.validate_params as vp
 from datetime import datetime
 
 

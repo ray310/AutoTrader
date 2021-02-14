@@ -1,5 +1,7 @@
 """ Testing text_to_order_params.py function"""
+import itertools
 import src.text_to_order_params as ttop
+
 
 ORD_PARAMS = {
     "instruction": "BTO",
@@ -80,7 +82,7 @@ def test_ttop_valid_instruction(monkeypatch):
 def test_ttop_invalid_instructions():
     """Otherwise valid signal with prefix that is
     not exactly capitalized 'BTO' or 'STC' returns null"""
-    import itertools
+
 
     valid_instructions = ["BTO", "STC"]
     letters = []
@@ -95,7 +97,6 @@ def test_ttop_invalid_instructions():
 
 def test_ttop_instruction_with_extra_char():
     """Extra characters before or after 'BTO' or 'STC' prefixes return null"""
-    import itertools
 
     prefixes = ["BTO", "STC", "B", "C", "S", "T", "/"]
     extra_char_prefix = ["".join(x) for x in itertools.permutations(prefixes, 2)]
@@ -366,67 +367,52 @@ def test_ttop_stc_sl(monkeypatch):
     assert ttop.text_to_order_params("STC INTC 50C 12/31 @0.45 (SL @.35)") == ORD_PARAMS
 
 
-def test_parse_sl_valid(monkeypatch):
+def test_parse_sl_valid():
     """SL price is returned from comments string"""
-    monkeypatch.setitem(ORD_PARAMS, "instruction", "BTO")
     bases = ["SL@", "SL@ ", "SL @", "SL @ "]
     prices = ["1.45", "1.4", ".4", ".45"]
     for base in bases:
         for price in prices:
             comment = base + price
-
-            monkeypatch.setitem(ORD_PARAMS, "comments", comment)
-            assert ttop.parse_sl(ORD_PARAMS["comments"]) == price
-
-            comment2 = "comments " + comment + " comments"
-            monkeypatch.setitem(ORD_PARAMS, "comments", comment2)
-            assert ttop.parse_sl(ORD_PARAMS["comments"]) == price
+            assert ttop.parse_sl(comment) == price
+            comment2 = "comments(" + comment + ")comments"
+            assert ttop.parse_sl(comment2) == price
 
 
-def test_parse_sl_invalid(monkeypatch):
+def test_parse_sl_invalid():
     """Text with no valid SL instruction returns None"""
-    monkeypatch.setitem(ORD_PARAMS, "instruction", "BTO")
     invalid_bases = ["SL", "@ ", "L@", "L @", "S@", "S @", ""]
     prices = ["1.45", "1.4", ".4", ".45"]
     for base in invalid_bases:
         for price in prices:
             comment = base + price
-
-            monkeypatch.setitem(ORD_PARAMS, "comments", comment)
-            assert ttop.parse_sl(ORD_PARAMS["comments"]) is None
+            assert ttop.parse_sl(comment) is None
 
     bases = ["SL@", "SL@ ", "SL @", "SL @ "]
     invalid_prices = ["1.453", "1234.4", "@ .4", "a.45", "1.45a", ""]
     for base in bases:
         for price in invalid_prices:
             comment = base + price
-
-            monkeypatch.setitem(ORD_PARAMS, "comments", comment)
-            assert ttop.parse_sl(ORD_PARAMS["comments"]) is None
+            assert ttop.parse_sl(comment) is None
 
 
-def test_parse_risk_pass():
+def test_parse_risk_valid():
+    """Terms related to risk should return "high risk" """
     terms = ["risky", "daytrade", "small position", "light position"]
-    for trm in terms:
-        lst = [
-            trm[i].upper() if i % 2 == 0 else trm[i].lower() for i in range(len(trm))
-        ]
-        irregular_term = "".join(lst)
-        assert ttop.parse_risk(trm) == "high risk"
-        assert ttop.parse_risk(trm.upper()) == "high risk"
-        assert ttop.parse_risk(trm.lower()) == "high risk"
-        assert ttop.parse_risk(irregular_term) == "high risk"
+    comments = []
+    for t in terms:
+        lst = [t[i].upper() if i % 2 == 0 else t[i].lower() for i in range(len(t))]
+        comments.extend([t, "".join(lst)])
 
-        trm = "comments(" + trm + ")comments"
-        irregular_term = "comments " + trm + " comments"
-        assert ttop.parse_risk(trm) == "high risk"
-        assert ttop.parse_risk(trm.upper()) == "high risk"
-        assert ttop.parse_risk(trm.lower()) == "high risk"
-        assert ttop.parse_risk(irregular_term) == "high risk"
+    for comment in comments:
+        assert ttop.parse_risk(comment) == "high risk"
+        assert ttop.parse_risk("(" + comment + ")") == "high risk"
 
 
-def test_parse_risk_fail():
+def test_parse_risk_invalid():
+    """Comparable terms that do not match return None  """
     terms = [
+        "",
         "brisky",
         "risk",
         "day trade",
@@ -438,6 +424,28 @@ def test_parse_risk_fail():
     ]
     for term in terms:
         assert ttop.parse_risk(term) is None
+
+
+def test_parse_reduce_valid():
+    """Correct patterns return XX% """
+    terms = ["closing", "trim"]
+    percent = ["25%", "33%", "50%", "75%", "100%"]
+    for t in terms:
+        lst = [t[i].upper() if i % 2 == 0 else t[i].lower() for i in range(len(t))]
+        irreg_trm = "".join(lst)
+        for per in percent:
+            comments = []
+            comments.extend(["".join([t, " ", per]), "".join([irreg_trm, " ", per])])
+            for comment in comments:
+                assert ttop.parse_reduce(comment) == per
+                assert ttop.parse_reduce("(" + comment + ")") == per
+
+
+def test_parse_reduce_invalid():
+    """Close but incorrect patterns return None"""
+    comments = ["closing 50", "close 50%", "trim50%", ""]
+    for comment in comments:
+        assert ttop.parse_reduce(comment) is None
 
 
 def test_strip_markdown():
