@@ -357,7 +357,7 @@ def test_ttop_bto_sl(monkeypatch):
     assert ttop.text_to_order_params("BTO INTC 50C 12/31 @0.45 (SL @.35)") == ORD_PARAMS
 
 
-def test_ttop_stc(monkeypatch):
+def test_ttop_stc_sl(monkeypatch):
     """SL price is not parsed from a STC order"""
     temp_flag = {"SL": None, "risk_level": None, "reduce": None}  # 'SL' is None
     monkeypatch.setitem(ORD_PARAMS, "flags", temp_flag)
@@ -403,6 +403,41 @@ def test_parse_sl_invalid(monkeypatch):
 
             monkeypatch.setitem(ORD_PARAMS, "comments", comment)
             assert ttop.parse_sl(ORD_PARAMS["comments"]) is None
+
+
+def test_parse_risk_pass():
+    terms = ["risky", "daytrade", "small position", "light position"]
+    for trm in terms:
+        lst = [
+            trm[i].upper() if i % 2 == 0 else trm[i].lower() for i in range(len(trm))
+        ]
+        irregular_term = "".join(lst)
+        assert ttop.parse_risk(trm) == "high risk"
+        assert ttop.parse_risk(trm.upper()) == "high risk"
+        assert ttop.parse_risk(trm.lower()) == "high risk"
+        assert ttop.parse_risk(irregular_term) == "high risk"
+
+        trm = "comments(" + trm + ")comments"
+        irregular_term = "comments " + trm + " comments"
+        assert ttop.parse_risk(trm) == "high risk"
+        assert ttop.parse_risk(trm.upper()) == "high risk"
+        assert ttop.parse_risk(trm.lower()) == "high risk"
+        assert ttop.parse_risk(irregular_term) == "high risk"
+
+
+def test_parse_risk_fail():
+    terms = [
+        "brisky",
+        "risk",
+        "day trade",
+        "smallposition",
+        "small_position",
+        "flight position",
+        "light positions",
+        "light position5",
+    ]
+    for term in terms:
+        assert ttop.parse_risk(term) is None
 
 
 def test_strip_markdown():

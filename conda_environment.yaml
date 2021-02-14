@@ -7,6 +7,6 @@ dependencies:
     - pip:
         - discord.py==1.6.0
         - google-cloud-storage==1.35.0
-        - tda-api==1.1.4
+        - tda-api==1.1.5
         - coverage==5.4
         - selenium==3.141.0
