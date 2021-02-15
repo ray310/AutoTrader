@@ -15,19 +15,20 @@ ORD_PARAMS = {
 }
 
 
-def test_ttop_empty_string():
-    """No input returns null order"""
-    assert ttop.text_to_order_params("") is None
-
-
 def test_ttop_no_signal():
     """String with no signal returns null order"""
+    assert ttop.text_to_order_params("") is None
     assert ttop.text_to_order_params("Closing 100% Positions") is None
 
 
 def test_ttop_valid_signal():
     """Valid signal in string returns valid order parameters"""
     assert ttop.text_to_order_params("BTO INTC 50C 12/31 @0.45") == ORD_PARAMS
+
+
+def test_ttop_valid_signal_markdown():
+    """Markdown does not impede valid signal"""
+    assert ttop.text_to_order_params("BTO INTC 50C **12/31** __@0.45__") == ORD_PARAMS
 
 
 def test_ttop_signal_after_comment(monkeypatch):
@@ -82,8 +83,6 @@ def test_ttop_valid_instruction(monkeypatch):
 def test_ttop_invalid_instructions():
     """Otherwise valid signal with prefix that is
     not exactly capitalized 'BTO' or 'STC' returns null"""
-
-
     valid_instructions = ["BTO", "STC"]
     letters = []
     for instruction in valid_instructions:
@@ -365,6 +364,40 @@ def test_ttop_stc_sl(monkeypatch):
     monkeypatch.setitem(ORD_PARAMS, "comments", " (SL @.35)")
     monkeypatch.setitem(ORD_PARAMS, "instruction", "STC")
     assert ttop.text_to_order_params("STC INTC 50C 12/31 @0.45 (SL @.35)") == ORD_PARAMS
+
+
+def test_ttop_risk_level_valid(monkeypatch):
+    """High risk flag is set when risk related text is parsed from BTO order"""
+    temp_flag = {"SL": ".35", "risk_level": "high risk", "reduce": None}
+    monkeypatch.setitem(ORD_PARAMS, "flags", temp_flag)
+    monkeypatch.setitem(ORD_PARAMS, "comments", " (Risky Daytrade SL @.35)")
+    string = "BTO INTC 50C 12/31 @0.45 (Risky Daytrade SL @.35)"
+    assert ttop.text_to_order_params(string) == ORD_PARAMS
+
+
+def test_ttop_risk_level_invalid(monkeypatch):
+    """Risk flag is not set for STC order with risk related text"""
+    monkeypatch.setitem(ORD_PARAMS, "instruction", "STC")
+    monkeypatch.setitem(ORD_PARAMS, "comments", " (Risky Daytrade SL @.35)")
+    string = "STC INTC 50C 12/31 @0.45 (Risky Daytrade SL @.35)"
+    assert ttop.text_to_order_params(string) == ORD_PARAMS
+
+
+def test_ttop_reduce_position_valid(monkeypatch):
+    """Reduce position percent is set when indicated with STC order """
+    monkeypatch.setitem(ORD_PARAMS, "instruction", "STC")
+    temp_flag = {"SL": None, "risk_level": None, "reduce": "50%"}
+    monkeypatch.setitem(ORD_PARAMS, "flags", temp_flag)
+    monkeypatch.setitem(ORD_PARAMS, "comments", "(Closing 50%)")
+    string = "STC INTC 50C 12/31 @0.45(Closing 50%)"
+    assert ttop.text_to_order_params(string) == ORD_PARAMS
+
+
+def test_ttop_reduce_position_invalid(monkeypatch):
+    """Reduce flag not set for BTO order even with otherwise valid text """
+    monkeypatch.setitem(ORD_PARAMS, "comments", "(Closing 50%)")
+    string = "BTO INTC 50C 12/31 @0.45(Closing 50%)"
+    assert ttop.text_to_order_params(string) == ORD_PARAMS
 
 
 def test_parse_sl_valid():

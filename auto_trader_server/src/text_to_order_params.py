@@ -60,11 +60,12 @@ def text_to_order_params(string: str):
         "flags": {"SL": None, "risk_level": None, "reduce": None},
     }
 
+    # strip markdown from text
+    clean_string = strip_markdown(string)
+
     # Text should contain one and only one order signal
-    matches = [match for match in re.finditer(regex_pattern, string)]
-    if len(matches) == 0:
-        logging.info("String did not match signal pattern")
-    elif len(matches) == 1:
+    matches = [match for match in re.finditer(regex_pattern, clean_string)]
+    if len(matches) == 1:
         match = matches[0]  # match is re.Match object
         match.groups()
         order_params["instruction"] = match.group(1)
@@ -74,12 +75,17 @@ def text_to_order_params(string: str):
         order_params["expiration"] = match.group(5)
         order_params["contract_price"] = match.group(6)
         start, end = match.span()
-        comments = string[end:]
+        comments = clean_string[end:]
         if comments != "":
             order_params["comments"] = comments
             if order_params["instruction"] == "BTO":
                 order_params["flags"]["SL"] = parse_sl(order_params["comments"])
-    else:
+                order_params["flags"]["risk_level"] = parse_risk(
+                    order_params["comments"]
+                )
+            elif order_params["instruction"] == "STC":
+                order_params["flags"]["reduce"] = parse_reduce(order_params["comments"])
+    elif len(matches) > 1:
         logging.warning("Two or matches detected in string")
 
     if order_params == {
