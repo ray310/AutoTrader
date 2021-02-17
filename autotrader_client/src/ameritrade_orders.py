@@ -58,9 +58,7 @@ def initialize_order(ord_params):
             order_value = usr_set["max_ord_value"]
 
         buy_qty = calc_buy_order_quantity(
-            ord_params["contract_price"],
-            order_value,
-            usr_set["buy_limit_percent"],
+            ord_params["contract_price"], order_value, usr_set["buy_limit_percent"],
         )
         if buy_qty >= 1:
             ota_order = build_bto_order_w_stop_loss(
@@ -70,7 +68,7 @@ def initialize_order(ord_params):
                 usr_set["SL_percent"],
             )
             response = client.place_order(td_acct["acct_num"], order_spec=ota_order)
-            logging.info(response)
+            logging.info(response.content)
         else:
             msg1 = f"{ord_params} purchase quantity is 0\n"
             msg2 = (
@@ -85,12 +83,12 @@ def initialize_order(ord_params):
             if len(existing_stc_ids) > 0:
                 for ord_id in existing_stc_ids:
                     response = client.cancel_order(ord_id, td_acct["acct_num"])
-                    logging.info(response)
+                    logging.info(response.content)
             # TODO: Future feature: If sell_half flag then
             #  stc_market half and stc_stop_market other half
             stc = build_stc_market_order(ord_params, position_qty)
             response = client.place_order(td_acct["acct_num"], order_spec=stc)
-            logging.info(response)
+            logging.info(response.content)
     else:
         instr = ord_params["instruction"]
         logging.warning(f"Invalid order instruction: {instr}")
@@ -158,6 +156,7 @@ def build_bto_order_w_stop_loss(
     bto_lim = tda.orders.options.option_buy_to_open_limit(
         option_symbol, qty, buy_lim_price
     )
+    bto_lim.set_duration(tda.orders.common.Duration.FILL_OR_KILL)
     stc_stop_market = build_stc_stop_market(option_symbol, qty, stop_loss_price)
     one_trigger_other = tda.orders.common.first_triggers_second(
         bto_lim, stc_stop_market
