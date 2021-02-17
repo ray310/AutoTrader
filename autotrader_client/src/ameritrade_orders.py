@@ -5,6 +5,7 @@ import tda
 import tda.orders.options
 import json
 import logging
+import datetime
 from src.client_settings import (
     TD_TOKEN_PATH,
     TD_AUTH_PARAMS_PATH,
@@ -70,9 +71,7 @@ def initialize_order(ord_params):
         symbol = build_option_symbol(ord_params)
         position_qty = get_position_quant(client, td_acct["acct_num"], symbol)
         if position_qty >= 1:
-            existing_stc_ids = get_existing_stc_orders(
-                client, td_acct["acct_num"], symbol
-            )
+            existing_stc_ids = get_existing_stc_orders(client, symbol)
             if len(existing_stc_ids) > 0:
                 for ord_id in existing_stc_ids:
                     response = client.cancel_order(ord_id, td_acct["acct_num"])
@@ -89,8 +88,8 @@ def initialize_order(ord_params):
 
 # creating more than one client will likely cause issues with authentication
 def authenticate_tda_account(token_path: str, api_key: str, redirect_uri: str):
-    """Takes TDA app key and path to locally stored auth token and tries to authenticate.
-    If unable to authenticate with token, performs backup authentication
+    """Takes TDA app key and path to locally stored auth token and tries to
+    authenticate. If unable to authenticate with token, performs backup authentication
     from login auth flow. Returns authenticated client_tests object"""
     client = None
     try:
@@ -133,13 +132,6 @@ def build_bto_order_w_stop_loss(
     return one_trigger_other
 
 
-def build_stc_market_order(ord_params: dict, pos_qty: float):
-    """ Returns STC market order OrderBuilder obj"""
-    option_symbol = build_option_symbol(ord_params)
-    stc = tda.orders.options.option_sell_to_close_market(option_symbol, pos_qty)
-    return stc
-
-
 def calc_buy_order_quantity(price: float, max_ord_val: float, limit_percent: float):
     """Returns the order quantity (int) for a buy order based on
     the option price, maximum order size, and buy limit percent  """
@@ -161,6 +153,13 @@ def build_option_symbol(ord_params: dict):
     # OptionSymbol class does not return symbol until build method is called
     symbol = symbol_builder_class.build()
     return symbol
+
+
+def build_stc_market_order(ord_params: dict, pos_qty: float):
+    """ Returns STC market order OrderBuilder obj"""
+    option_symbol = build_option_symbol(ord_params)
+    stc = tda.orders.options.option_sell_to_close_market(option_symbol, pos_qty)
+    return stc
 
 
 def build_stc_stop_market(symbol: str, qty: int, stop_price: float):
@@ -189,24 +188,55 @@ def get_position_quant(client, acct_id: str, symbol: str):
     return float(quantity)
 
 
-def get_existing_stc_orders(client, acct_id: str, symbol_to_match: str):
+def get_existing_stc_orders(client, symbol: str):
     """Returns a list of existing single-leg STC orders for the given symbol.
     This library is not currently designed to work with multi-leg (complex) orders"""
-    response = client.get_account(
-        acct_id, fields=tda.client.Client.Account.Fields.ORDERS
+    now = datetime.datetime.utcnow()
+    query_start = now - datetime.timedelta(hours=32)  # from up to previous trading day
+    statuses = (
+        tda.client.Client.Order.Status.FILLED,
+        tda.client.Client.Order.Status.QUEUED,
+        tda.client.Client.Order.Status.ACCEPTED,
+        tda.client.Client.Order.Status.WORKING,
+    )  # waiting for tda patch to implement multi-status check and speed up query time
+
+    response = client.get_orders_by_query(
+        from_entered_datetime=query_start, statuses=None
     )
     summary = json.loads(response.content)
     order_ids = []
-    orders = summary["securitiesAccount"]["orderStrategies"]
-    for order in orders:
-        # examine active orders
-        if order["status"] == "WORKING" or order["status"] == "QUEUED":
+    for order in summary:
+        # examine active orders and their child orders
+        if order["status"] in ["WORKING", "QUEUED", "ACCEPTED"]:
             if len(order["orderLegCollection"]) == 1:  # no multi-leg orders
                 instruct = order["orderLegCollection"][0]["instruction"]
-                symbol = order["orderLegCollection"][0]["instrument"]["symbol"]
-                if instruct == "SELL_TO_CLOSE" and symbol == symbol_to_match:
+                ord_symbol = order["orderLegCollection"][0]["instrument"]["symbol"]
+                if ord_symbol == symbol and instruct == "SELL_TO_CLOSE":
                     order_ids.append(str(order["orderId"]))
+                elif ord_symbol == symbol and ["orderStrategyType"] == "TRIGGER":
+                    child_order_id = check_child_stc_order(order, symbol)
+                    if child_order_id:
+                        order_ids.append(child_order_id)
+
+        # if filled, check for open sell order with active status
+        elif order["status"] == "FILLED" and order["orderStrategyType"] == "TRIGGER":
+            child_order_id = check_child_stc_order(order, symbol)
+            if child_order_id:
+                order_ids.append(child_order_id)
     return order_ids
+
+
+def check_child_stc_order(order, symbol):
+    """Return order id if child order has STC order
+    for input symbol, else return None"""
+    # not currently handling conditional orders with more than one child order
+    child = order["childOrderStrategies"][0]
+    if child["status"] in ["WORKING", "QUEUED", "ACCEPTED"]:
+        if len(child["orderLegCollection"]) == 1:  # no multi-leg orders
+            instruct = child["orderLegCollection"][0]["instruction"]
+            ord_symbol = child["orderLegCollection"][0]["instrument"]["symbol"]
+            if ord_symbol == symbol and instruct == "SELL_TO_CLOSE":
+                return str(child["orderId"])
 
 
 def validate_user_settings(usr_settings: dict):
