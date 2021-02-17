@@ -1,4 +1,3 @@
-import logging
 import datetime
 from discord.ext import commands
 import src.gcp_utils as utils
@@ -14,20 +13,11 @@ class ListenerBot(commands.Bot):
         self.storage_bucket = storage_bucket
         self.author = author
 
-    async def on_ready(self):
-        logging.info(f"Logged in as {self.user}")
-
-    async def on_disconnect(self):
-        logging.info(f"Disconnected")
-
     async def on_message(self, message, author=None):
-        logging.info(message.content)
         order_params = ttop.text_to_order_params(message.content)
-        logging.info(f"Order Parameters: {order_params} ")
         if order_params is not None:
             dt_stamp = datetime.datetime.strftime(
                 datetime.datetime.now(datetime.timezone.utc), "%d-%b-%y_%H_%M_%S"
             )
             blob_name = order_params["ticker"] + dt_stamp + ".json"
-            logging.info("Sending order parameters to bucket")
             utils.upload_as_gcp_blob(self.storage_bucket, order_params, blob_name)
