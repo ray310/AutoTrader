@@ -1,4 +1,4 @@
-"""Driver for auto_trader_client"""
+"""Driver for autotrader_client"""
 
 
 import src.client_utils as utils

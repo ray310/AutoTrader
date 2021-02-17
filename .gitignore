@@ -9,4 +9,4 @@
 *.coverage
 htmlcov/
 logs/
-!auto_trader_client/sample_config/*
+!autotrader_client/sample_config/*
