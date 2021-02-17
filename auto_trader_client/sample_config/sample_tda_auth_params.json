@@ -1,5 +1,0 @@
-{
-  "tda_api_key": "Insert TD Ameritrade App Key Here",
-  "tda_auth_uri": "URI selected when creating TDA app like https://localhost",
-  "tda_acct": "Account you want to trade from"
-}
