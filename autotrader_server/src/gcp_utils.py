@@ -1,4 +1,4 @@
-"""Google Cloud Platform (GCP) utility functions for auto_trader_server"""
+"""Google Cloud Platform (GCP) utility functions for autotrader_server"""
 
 
 def download_gcp_blob(bucket_name: str, source_blob_name: str, dest_file_name: str):
