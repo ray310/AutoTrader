@@ -1,4 +1,4 @@
-name: automatic_trading
+name: autotrader
 dependencies:
     - python=3.8
     - pip=20.3.3
