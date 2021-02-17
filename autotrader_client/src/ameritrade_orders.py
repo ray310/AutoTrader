@@ -51,9 +51,15 @@ def initialize_order(ord_params):
 
     # generate and place order
     if ord_params["instruction"] == "BTO":
+        # set order value based on risk level
+        if ord_params["flags"]["risk_level"] == "high risk":
+            order_value = usr_set["high_risk_ord_value"]
+        else:
+            order_value = usr_set["max_ord_value"]
+
         buy_qty = calc_buy_order_quantity(
             ord_params["contract_price"],
-            usr_set["max_ord_val"],
+            order_value,
             usr_set["buy_limit_percent"],
         )
         if buy_qty >= 1:
@@ -114,28 +120,6 @@ def authenticate_tda_account(token_path: str, api_key: str, redirect_uri: str):
     return client
 
 
-def build_bto_order_w_stop_loss(
-    ord_params: dict, qty: int, limit_percent: float, stop_loss_percent: float
-):
-    """Prepares and returns OrderBuilder object for one-trigger another order.
-    First order is BTO limit and second order is STC stop-market"""
-
-    # prepare BTO inputs
-    buy_lim_price = round(ord_params["contract_price"] * (1 + limit_percent), 2)
-    stop_loss_price = round(ord_params["contract_price"] * (1 - stop_loss_percent), 2)
-    option_symbol = build_option_symbol(ord_params)
-
-    # prepare pre-filled OrderBuilder objs
-    bto_lim = tda.orders.options.option_buy_to_open_limit(
-        option_symbol, qty, buy_lim_price
-    )
-    stc_stop_market = build_stc_stop_market(option_symbol, qty, stop_loss_price)
-    one_trigger_other = tda.orders.common.first_triggers_second(
-        bto_lim, stc_stop_market
-    )
-    return one_trigger_other
-
-
 def calc_buy_order_quantity(price: float, max_ord_val: float, limit_percent: float):
     """Returns the order quantity (int) for a buy order based on
     the option price, maximum order size, and buy limit percent  """
@@ -157,6 +141,28 @@ def build_option_symbol(ord_params: dict):
     # OptionSymbol class does not return symbol until build method is called
     symbol = symbol_builder_class.build()
     return symbol
+
+
+def build_bto_order_w_stop_loss(
+    ord_params: dict, qty: int, limit_percent: float, stop_loss_percent: float
+):
+    """Prepares and returns OrderBuilder object for one-trigger another order.
+    First order is BTO limit and second order is STC stop-market"""
+
+    # prepare BTO inputs
+    buy_lim_price = round(ord_params["contract_price"] * (1 + limit_percent), 2)
+    stop_loss_price = round(ord_params["contract_price"] * (1 - stop_loss_percent), 2)
+    option_symbol = build_option_symbol(ord_params)
+
+    # prepare pre-filled OrderBuilder objs
+    bto_lim = tda.orders.options.option_buy_to_open_limit(
+        option_symbol, qty, buy_lim_price
+    )
+    stc_stop_market = build_stc_stop_market(option_symbol, qty, stop_loss_price)
+    one_trigger_other = tda.orders.common.first_triggers_second(
+        bto_lim, stc_stop_market
+    )
+    return one_trigger_other
 
 
 def build_stc_market_order(ord_params: dict, pos_qty: float):
