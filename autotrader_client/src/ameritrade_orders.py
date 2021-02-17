@@ -13,7 +13,8 @@ from src.client_settings import (
     TD_DICT_KEY_URI,
     TD_DICT_KEY_ACCT,
     ORD_SETTINGS_PATH,
-    ORD_VAL_KEY,
+    MAX_ORD_VAL_KEY,
+    RISKY_ORD_VAL_KEY,
     BUY_LIM_KEY,
     SL_KEY,
 )
@@ -33,8 +34,11 @@ def initialize_order(ord_params):
 
     with open(ORD_SETTINGS_PATH) as fp:
         order_settings = json.load(fp)
+    # max_ord_val is max $ value of order e.g. 500.00
+    # high_risk_ord_value is the order value for higher risk orders
     usr_set = {
-        "max_ord_val": order_settings[ORD_VAL_KEY],  # max $ value of order e.g. 500.00
+        "max_ord_val": order_settings[MAX_ORD_VAL_KEY],
+        "high_risk_ord_value": order_settings[RISKY_ORD_VAL_KEY],
         "buy_limit_percent": order_settings[BUY_LIM_KEY],
         "SL_percent": order_settings[SL_KEY],
     }

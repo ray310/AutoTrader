@@ -12,7 +12,8 @@ DEFAULT_ORDER_DIR = "signals"
 
 # Order settings
 ORD_SETTINGS_PATH = "config/order_guidelines.json"
-ORD_VAL_KEY = "order_value"
+MAX_ORD_VAL_KEY = "max_order_value"
+RISKY_ORD_VAL_KEY = "high_risk_order_value"
 BUY_LIM_KEY = "buy_limit_percent"
 SL_KEY = "SL_percentage"
 

@@ -1,5 +1,6 @@
 {
-  "order_value": 500,
+  "max_order_value": 1000.00,
+  "high_risk_order_value": 500.00,
   "buy_limit_percent": 0.05,
   "SL_percentage": 0.10
 }
