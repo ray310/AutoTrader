@@ -6,6 +6,7 @@ import tda.orders.options
 import json
 import logging
 import datetime
+import math
 from src.client_settings import (
     TD_TOKEN_PATH,
     TD_AUTH_PARAMS_PATH,
@@ -61,11 +62,19 @@ def initialize_order(ord_params):
             ord_params["contract_price"], order_value, usr_set["buy_limit_percent"],
         )
         if buy_qty >= 1:
+            if ord_params["flags"]["SL"]:
+                suggested_sl = float(ord_params["flags"]["SL"])
+                suggested_sl_percent = calc_sl_percentage(
+                    ord_params["contract_price"], suggested_sl
+                )
+                # use more conservative of two
+                if suggested_sl_percent < usr_set["SL_percent"]:
+                    sl_percent = suggested_sl_percent
+                else:
+                    sl_percent = usr_set["SL_percent"]
+
             ota_order = build_bto_order_w_stop_loss(
-                ord_params,
-                buy_qty,
-                usr_set["buy_limit_percent"],
-                usr_set["SL_percent"],
+                ord_params, buy_qty, usr_set["buy_limit_percent"], sl_percent,
             )
             response = client.place_order(td_acct["acct_num"], order_spec=ota_order)
             logging.info(response.content)
@@ -84,11 +93,18 @@ def initialize_order(ord_params):
                 for ord_id in existing_stc_ids:
                     response = client.cancel_order(ord_id, td_acct["acct_num"])
                     logging.info(response.content)
-            # TODO: Future feature: If sell_half flag then
-            #  stc_market half and stc_stop_market other half
-            stc = build_stc_market_order(ord_params, position_qty)
-            response = client.place_order(td_acct["acct_num"], order_spec=stc)
-            logging.info(response.content)
+            if ord_params["flags"]["reduce"]:
+                sell_qty, keep_qty = calc_reduction(position_qty, ord_params["flags"]["reduce"])
+                stc = build_stc_market_order(ord_params, sell_qty)
+                response = client.place_order(td_acct["acct_num"], order_spec=stc)
+                logging.info(response.content)
+                stc_stop = build_stc_stop_market(symbol, keep_qty, ord_params["contract_price"])  #TODO: needs to calculate stop price
+                response = client.place_order(td_acct["acct_num"], order_spec=stc_stop)
+                logging.info(response.content)
+            else:
+                stc = build_stc_market_order(ord_params, position_qty)
+                response = client.place_order(td_acct["acct_num"], order_spec=stc)
+                logging.info(response.content)
     else:
         instr = ord_params["instruction"]
         logging.warning(f"Invalid order instruction: {instr}")
@@ -114,8 +130,16 @@ def authenticate_tda_account(token_path: str, api_key: str, redirect_uri: str):
             client = tda.auth.client_from_login_flow(
                 driver, api_key, redirect_uri, token_path
             )
-
     return client
+
+
+def calc_reduction(pos_qty: int, string_percent: str):
+    """Calculate the quantity that should be immediately sold and the quantity that
+    should be held with an STC stop market in place. Returns sell / keep quantities"""
+    reduce_per = (float(string_percent.replace("%", ""))) / 100
+    sell_qty = math.ceil(pos_qty * reduce_per)
+    keep_qty = pos_qty - sell_qty
+    return sell_qty, keep_qty
 
 
 def calc_buy_order_quantity(price: float, max_ord_val: float, limit_percent: float):
@@ -125,6 +149,11 @@ def calc_buy_order_quantity(price: float, max_ord_val: float, limit_percent: flo
     lot_value = price * lot_size * (1 + limit_percent)
     quantity = max_ord_val / lot_value
     return int(quantity)  # int() rounds down
+
+
+def calc_sl_percentage(contract_price: float, sl_price: float):
+    """Returns percentage difference from contract price to stop loss price"""
+    return (contract_price - sl_price) / contract_price
 
 
 def build_option_symbol(ord_params: dict):
@@ -142,7 +171,11 @@ def build_option_symbol(ord_params: dict):
 
 
 def build_bto_order_w_stop_loss(
-    ord_params: dict, qty: int, limit_percent: float, stop_loss_percent: float
+    ord_params: dict,
+    qty: int,
+    limit_percent: float,
+    stop_loss_percent: float,
+    kill_fill=True,
 ):
     """Prepares and returns OrderBuilder object for one-trigger another order.
     First order is BTO limit and second order is STC stop-market"""
@@ -156,7 +189,8 @@ def build_bto_order_w_stop_loss(
     bto_lim = tda.orders.options.option_buy_to_open_limit(
         option_symbol, qty, buy_lim_price
     )
-    bto_lim.set_duration(tda.orders.common.Duration.FILL_OR_KILL)
+    if kill_fill:
+        bto_lim.set_duration(tda.orders.common.Duration.FILL_OR_KILL)
     stc_stop_market = build_stc_stop_market(option_symbol, qty, stop_loss_price)
     one_trigger_other = tda.orders.common.first_triggers_second(
         bto_lim, stc_stop_market
