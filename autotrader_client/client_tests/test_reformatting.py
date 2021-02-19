@@ -47,6 +47,7 @@ def test_reformat_params_valid_prices(monkeypatch):
 
     def mock_expr_str_to_datetime(string):
         return datetime(yr, 12, 31)
+
     monkeypatch.setattr(vp, "expiration_str_to_datetime", mock_expr_str_to_datetime)
 
     # create tuples where the first value should be reformatted to the second
@@ -78,6 +79,7 @@ def test_reformat_params_reduction(monkeypatch):
 
     def mock_expr_str_to_datetime(string):
         return datetime(yr, 12, 31)
+
     monkeypatch.setattr(vp, "expiration_str_to_datetime", mock_expr_str_to_datetime)
 
     input_flags = {"SL": None, "risk_level": None, "reduce": "50%"}

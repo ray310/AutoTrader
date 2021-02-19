@@ -332,7 +332,7 @@ def test_validate_valid_sl_flag(monkeypatch):
 
 
 def test_validate_invalid_sl_flag(monkeypatch):
-    sl_prices = ["-1.0", "0.0", "0", "1000", 1, 1.0, ["1.0"], ("1.0", ), True, False]
+    sl_prices = ["-1.0", "0.0", "0", "1000", 1, 1.0, ["1.0"], ("1.0",), True, False]
     for price in sl_prices:
         test_flags = {"SL": price, "risk_level": None, "reduce": None}
         monkeypatch.setitem(ORD_PARAMS, "flags", test_flags)
