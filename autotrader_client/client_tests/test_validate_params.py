@@ -10,11 +10,12 @@ ORD_PARAMS = {
     "expiration": "12/31",
     "contract_price": "0.45",
     "comments": None,
+    "flags": {"SL": None, "risk_level": None, "reduce": None},
 }
 
 USR_SETTINGS = {
     "max_ord_val": 500,
-    "high_risk_ord_value": 300,
+    "high_risk_ord_val": 300,
     "buy_limit_percent": 0.04,
     "SL_percent": 0.2,
 }
@@ -43,11 +44,6 @@ def test_validate_params_invalid_expiration_date(monkeypatch):
 
 def test_validate_params_valid_instruction(monkeypatch):
     """Valid instructions should return True"""
-
-    def mock_is_expiration_valid(expiration):
-        return True
-
-    monkeypatch.setattr(vp, "is_expiration_valid", mock_is_expiration_valid)
     good_instructions = ["BTO", "STC"]
     for good in good_instructions:
         monkeypatch.setitem(ORD_PARAMS, "instruction", good)
@@ -111,11 +107,6 @@ def test_validate_params_bad_instruction(monkeypatch):
 
 def test_validate_params_good_tickers(monkeypatch):
     """Valid tickers should return True """
-
-    def mock_is_expiration_valid(expiration):
-        return True
-
-    monkeypatch.setattr(vp, "is_expiration_valid", mock_is_expiration_valid)
     tickers = ["A", "AB", "ABC", "ABCD", "ABCDE"]
     for tckr in tickers:
         monkeypatch.setitem(ORD_PARAMS, "ticker", tckr)
@@ -148,11 +139,6 @@ def test_validate_params_bad_tickers(monkeypatch):
 
 def test_validate_params_valid_strike(monkeypatch):
     """Valid strike price should return True"""
-
-    def mock_is_expiration_valid(expiration):
-        return True
-
-    monkeypatch.setattr(vp, "is_expiration_valid", mock_is_expiration_valid)
     good_strike = ["1", "12", "123", "1234", "12345", "12345.5", "12345.50"]
     for good in good_strike:
         monkeypatch.setitem(ORD_PARAMS, "strike_price", good)
@@ -194,6 +180,7 @@ def test_is_expiration_valid_good_dates(monkeypatch):
         return False
 
     monkeypatch.setattr(vp, "expired", mock_expired)
+
     expirations = [
         "1/1",
         "12/12",
@@ -260,11 +247,6 @@ def test_expired():
 
 def test_validate_params_valid_contract_type(monkeypatch):
     """Valid contract type should return True"""
-
-    def mock_is_expiration_valid(expiration):
-        return True
-
-    monkeypatch.setattr(vp, "is_expiration_valid", mock_is_expiration_valid)
     good_contract = ["C", "P"]
     for good in good_contract:
         monkeypatch.setitem(ORD_PARAMS, "contract_type", good)
@@ -299,11 +281,6 @@ def test_validate_params_bad_contract_type(monkeypatch):
 
 def test_validate_params_valid_contract_price(monkeypatch):
     """Valid contract price returns True (positive number under 1000)"""
-
-    def mock_is_expiration_valid(expiration):
-        return True
-
-    monkeypatch.setattr(vp, "is_expiration_valid", mock_is_expiration_valid)
     prices = [
         ".01",
         ".12",
@@ -346,11 +323,62 @@ def test_validate_params_bad_contract_price(monkeypatch):
         assert vp.validate_params(ORD_PARAMS) is False
 
 
-def test_validate_user_inputs_no_warning_or_exception(monkeypatch):
+def test_validate_valid_sl_flag(monkeypatch):
+    sl_prices = ["0.01", ".01", "0.1", ".1", "999.99", None]
+    for price in sl_prices:
+        test_flags = {"SL": price, "risk_level": None, "reduce": None}
+        monkeypatch.setitem(ORD_PARAMS, "flags", test_flags)
+        assert vp.validate_params(ORD_PARAMS) is True
+
+
+def test_validate_invalid_sl_flag(monkeypatch):
+    sl_prices = ["-1.0", "0.0", "0", "1000", 1, 1.0, ["1.0"], ("1.0", ), True, False]
+    for price in sl_prices:
+        test_flags = {"SL": price, "risk_level": None, "reduce": None}
+        monkeypatch.setitem(ORD_PARAMS, "flags", test_flags)
+        assert vp.validate_params(ORD_PARAMS) is False
+
+
+def test_validate_valid_risk_level(monkeypatch):
+    risk_levels = ["high risk", None]
+    for risk in risk_levels:
+        test_flags = {"SL": None, "risk_level": risk, "reduce": None}
+        monkeypatch.setitem(ORD_PARAMS, "flags", test_flags)
+        assert vp.validate_params(ORD_PARAMS) is True
+
+
+def test_validate_invalid_risk_level(monkeypatch):
+    risk_levels = ["High Risk", "risky", True, False]
+    for risk in risk_levels:
+        test_flags = {"SL": None, "risk_level": risk, "reduce": None}
+        monkeypatch.setitem(ORD_PARAMS, "flags", test_flags)
+        assert vp.validate_params(ORD_PARAMS) is False
+
+
+def test_validate_valid_reduce(monkeypatch):
+    reduction = ["25%", "50%", "75%", "100%"]
+    for reduce in reduction:
+        test_flags = {"SL": None, "risk_level": None, "reduce": reduce}
+        monkeypatch.setitem(ORD_PARAMS, "flags", test_flags)
+        assert vp.validate_params(ORD_PARAMS) is True
+
+
+def test_validate_invalid_reduce(monkeypatch):
+    reduction = ["-50%", "0%", "110%", "25", "0.50", 0.50, True, False]
+    for reduce in reduction:
+        test_flags = {"SL": None, "risk_level": None, "reduce": reduce}
+        monkeypatch.setitem(ORD_PARAMS, "flags", test_flags)
+        assert vp.validate_params(ORD_PARAMS) is False
+
+
+def test_validate_user_inputs_no_warning_or_exception(monkeypatch, capsys):
     """ Value range of user inputs issues no warning or exception"""
-    safe_max_order = [500, 500.01, 1000, 1000.01, 10000, 10000.01]
-    for max_ord in safe_max_order:
-        monkeypatch.setitem(USR_SETTINGS, "max_ord_val", max_ord)
+    max_orders = [500, 500.01, 1000, 1000.01, 10000, 10000.01]
+    risk_orders = [300, 300.01, 500, 500.01, 5000, 5000.01]
+    ord_limits = zip(max_orders, risk_orders)
+    for ord in ord_limits:
+        monkeypatch.setitem(USR_SETTINGS, "max_ord_val", ord[0])
+        monkeypatch.setitem(USR_SETTINGS, "high_risk_ord_val", ord[1])
         assert vp.validate_user_settings(USR_SETTINGS) is None
 
     safe_buy_limit = [0, 0.0, 0.1, 0.10, 0.10, 0.19, 0.190, 0.190, 0.1999, 0.1999]
@@ -363,8 +391,11 @@ def test_validate_user_inputs_no_warning_or_exception(monkeypatch):
         monkeypatch.setitem(USR_SETTINGS, "SL_percent", sl)
         assert vp.validate_user_settings(USR_SETTINGS) is None
 
+    captured = capsys.readouterr()
+    assert captured.err == ""
 
-def test_validate_user_inputs_raise_type_error_max(monkeypatch):
+
+def test_validate_user_inputs_raise_type_error_ord_sizes(monkeypatch):
     """ Raise TypeError Exceptions"""
     except_max_order = [
         "500",
@@ -379,6 +410,25 @@ def test_validate_user_inputs_raise_type_error_max(monkeypatch):
     ]
     for max_ord in except_max_order:
         monkeypatch.setitem(USR_SETTINGS, "max_ord_val", max_ord)
+        with pytest.raises(TypeError):
+            vp.validate_user_settings(USR_SETTINGS)
+
+
+def test_validate_user_inputs_raise_type_error_risk_ord_sizes(monkeypatch):
+    """ Raise TypeError Exceptions"""
+    except_risk_order = [
+        "500",
+        "500.01",
+        (500,),
+        [500],
+        {"max_ord_val": 500},
+        True,
+        False,
+        None,
+        USR_SETTINGS,
+    ]
+    for ord in except_risk_order:
+        monkeypatch.setitem(USR_SETTINGS, "high_risk_ord_val", ord)
         with pytest.raises(TypeError):
             vp.validate_user_settings(USR_SETTINGS)
 
@@ -428,6 +478,16 @@ def test_validate_user_inputs_raise_value_error_max(monkeypatch):
             vp.validate_user_settings(USR_SETTINGS)
 
 
+def test_validate_user_inputs_raise_value_error_risk(monkeypatch):
+    """ Raise ValueError Exceptions. High risk order cannot be higher than max order"""
+    monkeypatch.setitem(USR_SETTINGS, "max_ord_val", 200)
+    except_order = [-100, -100.0, -100.0, 300]
+    for ord in except_order:
+        monkeypatch.setitem(USR_SETTINGS, "high_risk_ord_val", ord)
+        with pytest.raises(ValueError):
+            vp.validate_user_settings(USR_SETTINGS)
+
+
 def test_validate_user_inputs_raise_value_error_buy_limit(monkeypatch):
     except_buy_limit = [-100, -100.0, -100.0]
     for bl in except_buy_limit:
@@ -445,7 +505,8 @@ def test_validate_user_inputs_raise_value_error_sl(monkeypatch):
 
 
 def test_validate_user_inputs_warn_low_max(monkeypatch, capsys):
-    warn_max_order = [0.01, 250, 499.99]
+    monkeypatch.setitem(USR_SETTINGS, "high_risk_ord_val", 0.01)
+    warn_max_order = [0.02, 250, 499.99]
     msg1 = "Maximum order value is less than $500.\n"
     msg2 = "This is too small for some orders and may result in failure to purchase\n"
     for max_ord in warn_max_order:
@@ -453,6 +514,16 @@ def test_validate_user_inputs_warn_low_max(monkeypatch, capsys):
         vp.validate_user_settings(USR_SETTINGS)
         captured = capsys.readouterr()
         assert captured.err == msg1 + msg2
+
+
+def test_validate_user_inputs_warn_high_risk(monkeypatch, capsys):
+    msg = "High risk order value is the same as max order value. Are you sure?\n"
+
+    monkeypatch.setitem(USR_SETTINGS, "max_ord_val", 1000)
+    monkeypatch.setitem(USR_SETTINGS, "high_risk_ord_val", 1000)
+    vp.validate_user_settings(USR_SETTINGS)
+    captured = capsys.readouterr()
+    assert captured.err == msg
 
 
 def test_validate_user_inputs_warn_high_buy_limit(monkeypatch, capsys):

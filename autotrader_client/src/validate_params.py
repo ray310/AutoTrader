@@ -1,6 +1,7 @@
 """Functions used validate and reformat order parameters (parsed text) dictionary
 and user settings"""
 import sys
+import copy
 
 
 def validate_params(order_params):
@@ -28,6 +29,16 @@ def validate_params(order_params):
         assert 0 < float(order_params["contract_price"]) < 1000
         if not is_expiration_valid(order_params["expiration"]):
             raise ValueError
+        if order_params["flags"]["SL"] is not None:
+            assert isinstance(order_params["flags"]["SL"], str) is True
+            assert 0 < float(order_params["flags"]["SL"]) < 1000
+        if order_params["flags"]["risk_level"] is not None:
+            assert order_params["flags"]["risk_level"] == "high risk"
+        if order_params["flags"]["reduce"] is not None:
+            reduction = order_params["flags"]["reduce"]
+            assert isinstance(reduction, str)
+            assert reduction.find("%") != -1
+            assert 0 < float(reduction.replace("%", "")) <= 100
     except (AssertionError, ValueError, KeyError):
         str_params = str(order_params)
         logging.warning(f"{str_params} failed validation")
@@ -79,23 +90,30 @@ def expired(dt_obj):
 
 
 def reformat_params(order_params):
-    """Reformat order parameters before generating order. Takes dictionary of parsed text
-    and returns reformatted dictionary"""
+    """Re-formats order parameters before generating order. Takes dictionary of
+    parsed text and returns reformatted dictionary"""
+    formatted = copy.deepcopy(order_params)
 
     # remove superfluous zeroes from strike price
-    strike = float(order_params["strike_price"])
+    strike = float(formatted["strike_price"])
     if strike % 1 == 0:
-        order_params["strike_price"] = str(int(strike))
+        formatted["strike_price"] = str(int(strike))
     elif strike % 0.5 == 0:
-        order_params["strike_price"] = str(strike)
+        formatted["strike_price"] = str(strike)
     else:
         raise ValueError(f"Strike price is {strike}; an illegal value")
 
-    order_params["contract_price"] = float(order_params["contract_price"])
+    formatted["contract_price"] = float(formatted["contract_price"])
 
     # convert expiration string to datetime object for tda package
-    order_params["expiration"] = expiration_str_to_datetime(order_params["expiration"])
-    return order_params
+    formatted["expiration"] = expiration_str_to_datetime(formatted["expiration"])
+
+    if formatted["flags"]["SL"] is not None:
+        formatted["flags"]["SL"] = float(formatted["flags"]["SL"])
+    if formatted["flags"]["reduce"] is not None:
+        reduction = formatted["flags"]["reduce"]
+        formatted["flags"]["reduce"] = float(reduction.replace("%", "")) / 100
+    return formatted
 
 
 def expiration_str_to_datetime(exp_str):
@@ -119,7 +137,6 @@ def expiration_str_to_datetime(exp_str):
 def validate_user_settings(usr_settings: dict):
     """Raises an error for invalid inputs or sends a warning message to std.err"""
 
-    # TODO: Validate risky order settings
     try:
         for key, val in usr_settings.items():
             assert not isinstance(val, bool)
@@ -132,6 +149,8 @@ def validate_user_settings(usr_settings: dict):
         for key, val in usr_settings.items():
             if key == "max_ord_val":
                 assert val > 0
+            elif key == "high_risk_ord_val":
+                assert 0 <= val <= usr_settings["max_ord_val"]
             elif key == "SL_percent":
                 assert 0 <= val < 1
             else:
@@ -146,6 +165,10 @@ def validate_user_settings(usr_settings: dict):
             "This is too small for some orders and may result in failure to purchase\n"
         )
         sys.stderr.write(msg1 + msg2)
+
+    if usr_settings["max_ord_val"] == usr_settings["high_risk_ord_val"]:
+        msg1 = "High risk order value is the same as max order value. Are you sure?\n"
+        sys.stderr.write(msg1)
 
     if usr_settings["buy_limit_percent"] >= 0.20:
         msg = f"Buy limit is {usr_settings['buy_limit_percent']}. Is that too risky?\n"
