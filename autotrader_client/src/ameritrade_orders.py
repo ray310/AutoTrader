@@ -40,13 +40,13 @@ def initialize_order(ord_params):
     # high_risk_ord_value is the order value for higher risk orders
     usr_set = {
         "max_ord_val": order_settings[MAX_ORD_VAL_KEY],
-        "high_risk_ord_value": order_settings[RISKY_ORD_VAL_KEY],
+        "high_risk_ord_val": order_settings[RISKY_ORD_VAL_KEY],
         "buy_limit_percent": order_settings[BUY_LIM_KEY],
         "SL_percent": order_settings[SL_KEY],
     }
 
     # check user inputs
-    vp.validate_user_settings(usr_set)  # TODO: make sure validation for high risk written
+    vp.validate_user_settings(usr_set)
 
     # authenticate
     client = authenticate_tda_account(TD_TOKEN_PATH, td_acct["api_key"], td_acct["uri"])
@@ -55,30 +55,7 @@ def initialize_order(ord_params):
     if ord_params["instruction"] == "BTO":
         process_bto_order(client, td_acct["acct_num"], ord_params, usr_set)
     elif ord_params["instruction"] == "STC":
-        symbol = build_option_symbol(ord_params)
-        position_qty = get_position_quant(client, td_acct["acct_num"], symbol)
-        if position_qty >= 1:
-            existing_stc_ids = get_existing_stc_orders(client, symbol)
-            if len(existing_stc_ids) > 0:
-                for ord_id in existing_stc_ids:
-                    response = client.cancel_order(ord_id, td_acct["acct_num"])
-                    logging.info(response.content)
-            if ord_params["flags"]["reduce"]:
-                sell_qty, keep_qty = calc_position_reduction(
-                    position_qty, ord_params["flags"]["reduce"]
-                )
-                stc = build_stc_market_order(ord_params, sell_qty)
-                response = client.place_order(td_acct["acct_num"], order_spec=stc)
-                logging.info(response.content)
-                stc_stop = build_stc_stop_market(
-                    symbol, keep_qty, ord_params["contract_price"]
-                )  # TODO: needs to calculate stop price
-                response = client.place_order(td_acct["acct_num"], order_spec=stc_stop)
-                logging.info(response.content)
-            else:
-                stc = build_stc_market_order(ord_params, position_qty)
-                response = client.place_order(td_acct["acct_num"], order_spec=stc)
-                logging.info(response.content)
+        process_stc_order(client, td_acct["acct_num"], ord_params, usr_set)
     else:
         instr = ord_params["instruction"]
         logging.warning(f"Invalid order instruction: {instr}")
@@ -121,21 +98,28 @@ def build_option_symbol(ord_params: dict):
     return symbol
 
 
-# BTO-related functions
-def process_bto_order(client, acct_num, ord_params: dict, usr_set: dict):
-    """ Prepare and place BTO order. """
+def output_response(ord_params: dict, response):
+    """Logs non-json response and sends it to std.out"""
+    logging.info(ord_params)
+    logging.info(response)
+    print(ord_params)
+    print(f"Processed order. Response received: {response}")
 
+
+# BTO-related functions
+def process_bto_order(client, acct_num: str, ord_params: dict, usr_set: dict):
+    """Prepare and place BTO order"""
     # determine risk level and corresponding order size
     if ord_params["flags"]["risk_level"] == "high risk":
-        order_value = usr_set["high_risk_ord_value"]
+        order_value = usr_set["high_risk_ord_val"]
     else:
-        order_value = usr_set["max_ord_value"]
-
+        order_value = usr_set["max_ord_val"]
+    print(order_value)
     # determine purchase quantity
     buy_qty = calc_buy_order_quantity(
         ord_params["contract_price"], order_value, usr_set["buy_limit_percent"],
     )
-
+    print(buy_qty)
     if buy_qty >= 1:
         option_symbol = build_option_symbol(ord_params)
 
@@ -146,20 +130,22 @@ def process_bto_order(client, acct_num, ord_params: dict, usr_set: dict):
             rec_sl_percent = calc_sl_percentage(ord_params["contract_price"], rec_sl)
             if rec_sl_percent < usr_set["SL_percent"]:
                 sl_percent = rec_sl_percent
-
+        print(sl_percent)
         sl_price = calc_sl_price(ord_params["contract_price"], sl_percent)
-        buy_lim_price = calc_buy_limit_price(ord_params["contract_price"], usr_set["buy_limit_percent"])
+        buy_lim_price = calc_buy_limit_price(
+            ord_params["contract_price"], usr_set["buy_limit_percent"]
+        )
 
         # prepare buy limit order and accompanying stop loss order
-        ota_order = build_bto_order_w_stop_loss(option_symbol, buy_qty, buy_lim_price, sl_price)
+        ota_order = build_bto_order_w_stop_loss(
+            option_symbol, buy_qty, buy_lim_price, sl_price
+        )
         response = client.place_order(acct_num, order_spec=ota_order)
-        logging.info(response.content)
-        sys.stdout(f"Processed order. Response received: {response.content}")
+        output_response(ord_params, response)
+
     else:
         msg1 = f"{ord_params} purchase quantity is 0\n"
-        msg2 = (
-            "This may be due to a low max order value or high buy limit percent\n\n"
-        )
+        msg2 = "This may be due to a low max order value or high buy limit percent\n\n"
         sys.stderr.write(msg1 + msg2)
 
 
@@ -188,11 +174,7 @@ def calc_sl_price(contract_price, sl_percent):
 
 
 def build_bto_order_w_stop_loss(
-        option_symbol: str,
-        qty: int,
-        buy_lim_price: float,
-        sl_price: float,
-        kill_fill=True,
+    option_symbol: str, qty: int, buy_lim_price: float, sl_price: float, kill_fill=True,
 ):
     """Prepares and returns OrderBuilder object for one-trigger another order.
     First order is BTO limit and second order is STC stop-market"""
@@ -201,7 +183,7 @@ def build_bto_order_w_stop_loss(
     bto_lim = tda.orders.options.option_buy_to_open_limit(
         option_symbol, qty, buy_lim_price
     )
-    if kill_fill:
+    if kill_fill is True:
         bto_lim.set_duration(tda.orders.common.Duration.FILL_OR_KILL)
     stc_stop_market = build_stc_stop_market(option_symbol, qty, sl_price)
     one_trigger_other = tda.orders.common.first_triggers_second(
@@ -210,13 +192,45 @@ def build_bto_order_w_stop_loss(
     return one_trigger_other
 
 
-##########      STC-related functions         ##########
-def process_stc_order():
-    """ Process STC order"""
-    pass
+# STC-related function
+def process_stc_order(client, acct_num: str, ord_params: dict, usr_set: dict):
+    """ Prepare and place STC order"""
+    option_symbol = build_option_symbol(ord_params)
+    pos_qty = get_position_quant(client, acct_num, option_symbol)
+    if pos_qty is not None and pos_qty >= 1:
+        # cancel existing STC orders (like stop-markets)
+        existing_stc_ids = get_existing_stc_orders(client, option_symbol)
+        if len(existing_stc_ids) > 0:
+            for ord_id in existing_stc_ids:
+                response = client.cancel_order(ord_id, acct_num)
+                logging.info(response.content)
+
+        # if the STC order is meant to reduce the position, sell the suggested %
+        # then issue a new STC stop-market for the remainder
+        if ord_params["flags"]["reduce"] is not None:
+            sell_qty, keep_qty = calc_position_reduction(
+                pos_qty, ord_params["flags"]["reduce"]
+            )
+
+            stc = build_stc_market_order(option_symbol, sell_qty)
+            response_stc = client.place_order(acct_num, order_spec=stc)
+
+            new_sl_price = calc_sl_price(
+                ord_params["contract_price"], usr_set["SL_percent"]
+            )
+            stc_stop = build_stc_stop_market(option_symbol, keep_qty, new_sl_price)
+            response_stop = client.place_order(acct_num, order_spec=stc_stop)
+
+            output_response(ord_params, response_stc)
+            output_response(ord_params, response_stop)
+
+        # else sell the entire position
+        else:
+            stc = build_stc_market_order(option_symbol, pos_qty)
+            response = client.place_order(acct_num, order_spec=stc)
+            output_response(ord_params, response)
 
 
-# get shares in existing position
 def get_position_quant(client, acct_id: str, symbol: str):
     """Takes client, account_id, and symbol to search for.
     Returns position long quantity for symbol"""
@@ -224,19 +238,17 @@ def get_position_quant(client, acct_id: str, symbol: str):
         acct_id, fields=tda.client.Client.Account.Fields.POSITIONS
     )
     summary = json.loads(response.content)
-    quantity = 0
     positions = summary["securitiesAccount"]["positions"]
     for position in positions:
         if position["instrument"]["symbol"] == symbol:
-            quantity = position["longQuantity"]
-    return float(quantity)
+            return float(position["longQuantity"])
 
 
-def get_existing_stc_orders(client, symbol: str):
+def get_existing_stc_orders(client, symbol: str, hours=32):
     """Returns a list of existing single-leg STC orders for the given symbol.
     This library is not currently designed to work with multi-leg (complex) orders"""
     now = datetime.datetime.utcnow()
-    query_start = now - datetime.timedelta(hours=32)  # from up to previous trading day
+    query_start = now - datetime.timedelta(hours=hours)
     statuses = (
         tda.client.Client.Order.Status.FILLED,
         tda.client.Client.Order.Status.QUEUED,
@@ -247,68 +259,53 @@ def get_existing_stc_orders(client, symbol: str):
     response = client.get_orders_by_query(
         from_entered_datetime=query_start, statuses=None
     )
-    summary = json.loads(response.content)
+    summary = response.json()
     order_ids = []
     for order in summary:
-        # examine active orders and their child orders
-        if order["status"] in ["WORKING", "QUEUED", "ACCEPTED"]:
-            if len(order["orderLegCollection"]) == 1:  # no multi-leg orders
-                instruct = order["orderLegCollection"][0]["instruction"]
-                ord_symbol = order["orderLegCollection"][0]["instrument"]["symbol"]
-                if ord_symbol == symbol and instruct == "SELL_TO_CLOSE":
-                    order_ids.append(str(order["orderId"]))
-                elif ord_symbol == symbol and ["orderStrategyType"] == "TRIGGER":
-                    child_order_id = check_child_stc_order(order, symbol)
-                    if child_order_id:
-                        order_ids.append(child_order_id)
+        # is the order an in-effect STC order?
+        stc_found = check_stc_order(order, symbol)
+        if stc_found is not None:
+            order_ids.append(stc_found)
 
-        # if filled, check for open sell order with active status
-        elif order["status"] == "FILLED" and order["orderStrategyType"] == "TRIGGER":
-            child_order_id = check_child_stc_order(order, symbol)
-            if child_order_id:
-                order_ids.append(child_order_id)
+        # does the order have a child order that is an in-effect STC order?
+        elif order["orderStrategyType"] == "TRIGGER":  # has a child order
+            # not currently handling conditional orders with more than one child order
+            child = order["childOrderStrategies"][0]
+            child_order_stc = check_stc_order(child, symbol)
+            if child_order_stc is not None:
+                order_ids.append(child_order_stc)
     return order_ids
 
 
-def check_child_stc_order(order, symbol):
-    """Return order id if child order has STC order
+def check_stc_order(order, symbol):
+    """Return order id if order has an in-effect STC order
     for input symbol, else return None"""
-    # not currently handling conditional orders with more than one child order
-    child = order["childOrderStrategies"][0]
-    if child["status"] in ["WORKING", "QUEUED", "ACCEPTED"]:
-        if len(child["orderLegCollection"]) == 1:  # no multi-leg orders
-            instruct = child["orderLegCollection"][0]["instruction"]
-            ord_symbol = child["orderLegCollection"][0]["instrument"]["symbol"]
+    if order["status"] in ["WORKING", "QUEUED", "ACCEPTED"]:
+        if len(order["orderLegCollection"]) == 1:  # no multi-leg orders
+            instruct = order["orderLegCollection"][0]["instruction"]
+            ord_symbol = order["orderLegCollection"][0]["instrument"]["symbol"]
             if ord_symbol == symbol and instruct == "SELL_TO_CLOSE":
-                return str(child["orderId"])
+                return str(order["orderId"])
 
 
-def calc_position_reduction(pos_qty: int, string_percent: str):
+def calc_position_reduction(pos_qty: int, percent: float):
     """Calculate the quantity that should be immediately sold and the quantity that
     should be held with an STC stop market in place. Returns sell / keep quantities"""
-    reduce_per = (float(string_percent.replace("%", ""))) / 100
-    sell_qty = math.ceil(pos_qty * reduce_per)
+    sell_qty = math.ceil(pos_qty * percent)
     keep_qty = pos_qty - sell_qty
     return sell_qty, keep_qty
 
 
-def build_stc_market_order(ord_params: dict, pos_qty: float):
+def build_stc_market_order(symbol: str, pos_qty: float):
     """ Returns STC market order OrderBuilder obj"""
-    option_symbol = build_option_symbol(
-        ord_params)  # TODO: pull this out of here and pass in symbol
-    stc = tda.orders.options.option_sell_to_close_market(option_symbol, pos_qty)
-    return stc
+    return tda.orders.options.option_sell_to_close_market(symbol, pos_qty)
 
 
 def build_stc_stop_market(symbol: str, qty: int, stop_price: float):
     """Return an OrderBuilder object for a STC stop-market order"""
     ord = tda.orders.options.option_sell_to_close_market(symbol, qty)
+    ord.set_duration(tda.orders.common.Duration.GOOD_TILL_CANCEL)
     ord.set_order_type(tda.orders.common.OrderType.STOP)
     trunc_price = round(stop_price, 2)
     ord.set_stop_price(trunc_price)  # truncated float
-    ord.set_duration(tda.orders.common.Duration.GOOD_TILL_CANCEL)
     return ord
-
-
-def build_stc_trailing_stop_market(symbol: str, qty: int, trail_percent: float):
-    pass
