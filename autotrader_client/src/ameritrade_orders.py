@@ -237,7 +237,7 @@ def get_position_quant(client, acct_id: str, symbol: str):
     response = client.get_account(
         acct_id, fields=tda.client.Client.Account.Fields.POSITIONS
     )
-    summary = json.loads(response.content)
+    summary = response.json()
     positions = summary["securitiesAccount"]["positions"]
     for position in positions:
         if position["instrument"]["symbol"] == symbol:

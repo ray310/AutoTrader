@@ -1,6 +1,5 @@
 """Tests for ameritrade_orders.py"""
 import pytest
-import requests
 import datetime
 import math
 import copy
@@ -96,6 +95,58 @@ ORD_JSON_DICT = {
     ],
 }
 
+POSITIONS = {
+    "securitiesAccount": {
+        "type": "CASH",
+        "accountId": "1234567890",
+        "roundTrips": 0,
+        "isDayTrader": False,
+        "isClosingOnlyRestricted": False,
+        "positions": [
+            {
+                "shortQuantity": 0.0,
+                "averagePrice": 0.6566,
+                "currentDayProfitLoss": -5.5,
+                "currentDayProfitLossPercentage": -9.02,
+                "longQuantity": 1.0,
+                "settledLongQuantity": 1.0,
+                "settledShortQuantity": 0.0,
+                "instrument": {
+                    "assetType": "OPTION",
+                    "cusip": "0SPY..P110300000",
+                    "symbol": "SPY_040121P300",
+                    "description": "SPY Apr 01 2021 300.0 Put",
+                    "type": "VANILLA",
+                    "putCall": "PUT",
+                    "underlyingSymbol": "SPY",
+                },
+                "marketValue": 55.5,
+                "maintenanceRequirement": 0.0,
+            },
+            {
+                "shortQuantity": 0.0,
+                "averagePrice": 1.0,
+                "currentDayProfitLoss": 0.0,
+                "currentDayProfitLossPercentage": 0.0,
+                "longQuantity": 27.0,
+                "settledLongQuantity": 27.0,
+                "settledShortQuantity": 0.0,
+                "instrument": {
+                    "assetType": "OPTION",
+                    "cusip": "0SPY..O310380000",
+                    "symbol": "SPY_030321P380",
+                    "description": "SPY Mar 03 2021 380.0 Put",
+                    "type": "VANILLA",
+                    "putCall": "PUT",
+                    "underlyingSymbol": "SPY",
+                },
+                "marketValue": 2700.0,
+                "maintenanceRequirement": 0.0,
+            },
+        ],
+    }
+}
+
 
 def test_authenticate_tda_account_token(monkeypatch):
     """Testing authentication flow with valid token"""
@@ -113,6 +164,29 @@ def test_calc_buy_order():
     assert isinstance(ret_val, int)
     assert am.calc_buy_order_quantity(price=1, ord_val=100, limit_percent=0) == 1
     assert am.calc_buy_order_quantity(price=1, ord_val=100, limit_percent=0.1) == 0
+
+
+def test_get_position_quant(monkeypatch):
+    """Returns long position or None if no long position"""
+    # mock call to API and returned object
+    class MockResponse:
+        @staticmethod
+        def json():
+            return POSITIONS
+
+    def mock_get_account(acct_id, fields):
+        return MockResponse
+
+    client = tda.client.Client
+    monkeypatch.setattr(client, "get_account", mock_get_account)
+    acct_num = "1234567890"
+
+    symbol = "SPY_030321P380"
+    qty = am.get_position_quant(client, acct_num, symbol)
+    assert math.isclose(qty, 27.0)
+
+    non_existent_symbol = "AAPL_030321C20"
+    assert am.get_position_quant(client, acct_num, non_existent_symbol) is None
 
 
 def test_get_existing_stc_orders_valid(monkeypatch):
@@ -142,8 +216,9 @@ def test_get_existing_stc_orders_valid(monkeypatch):
         return MockResponse
 
     client = tda.client.Client
-    symbol = "TSLA_030521P520"
     monkeypatch.setattr(client, "get_orders_by_query", mock_get_orders_by_query)
+
+    symbol = "TSLA_030521P520"
     assert am.get_existing_stc_orders(client, symbol) == ["1", "3"]
 
 
