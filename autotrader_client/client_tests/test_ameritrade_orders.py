@@ -1,18 +1,27 @@
 """Tests for ameritrade_orders.py"""
 import pytest
+import logging
 import datetime
 import math
 import copy
 import tda
 import src.ameritrade_orders as am
 
+USR_SET = {
+    "max_ord_val": 2000,
+    "high_risk_ord_val": 1000,
+    "buy_limit_percent": 0.03,
+    "SL_percent": 0.25,
+}
+
+
 VALID_ORD_INPUT = {
-    "instruction": "BTO",
-    "ticker": "TSLA",
-    "strike_price": "520",
+    "instruction": "STC",
+    "ticker": "SPY",
+    "strike_price": "380",
     "contract_type": "P",
-    "expiration": datetime.datetime(2021, 3, 5, 0, 0),
-    "contract_price": 1.00,
+    "expiration": datetime.datetime(2021, 3, 3, 0, 0),
+    "contract_price": 2.00,
     "comments": None,
     "flags": {"SL": None, "risk_level": None, "reduce": None},
 }
@@ -148,6 +157,7 @@ POSITIONS = {
 }
 
 
+
 def test_authenticate_tda_account_token(monkeypatch):
     """Testing authentication flow with valid token"""
 
@@ -164,6 +174,141 @@ def test_calc_buy_order():
     assert isinstance(ret_val, int)
     assert am.calc_buy_order_quantity(price=1, ord_val=100, limit_percent=0) == 1
     assert am.calc_buy_order_quantity(price=1, ord_val=100, limit_percent=0.1) == 0
+
+
+def test_process_stc_order_no_pos(monkeypatch, capsys):
+    """An STC order does nothing if there is no long position"""
+    client = tda.client.Client
+    acct_num = "1234567890"
+
+    def mock_get_position_quant(client, acct_id, symbol):
+        return 0
+
+    monkeypatch.setitem(VALID_ORD_INPUT, "ticker", "XYZ")
+    monkeypatch.setattr(am, "get_position_quant", mock_get_position_quant)
+    am.process_stc_order(client, acct_num, VALID_ORD_INPUT, USR_SET)
+    assert capsys.readouterr().out == ""  #TODO: wrong fix
+
+
+def test_process_stc_order_no_existing_orders_no_reduce(monkeypatch, caplog):
+    """An STC order with no existing STC order and no reduce flag
+    results in an STC market order"""
+    caplog.set_level(logging.INFO)
+    pos_qty = 1
+    client = tda.client.Client
+    acct_num = "123456789"
+
+    def mock_get_position_quant(client, acct_id, symbol):
+        return pos_qty
+
+    def mock_get_existing_stc_orders(client, option_symbol):
+        if option_symbol == "SPY_030321P380":
+            return []
+        else:
+            raise ValueError("Expected option symbol not received")
+
+    def mock_place_order(acct_num, order_spec):
+        built_order = order_spec.build()
+        if built_order["orderLegCollection"][0]["quantity"] == pos_qty:
+            return "PASAR"
+        else:
+            raise ValueError("STC market quantity does not match expected value")
+
+    monkeypatch.setattr(am, "get_position_quant", mock_get_position_quant)
+    monkeypatch.setattr(am, "get_existing_stc_orders", mock_get_existing_stc_orders)
+    monkeypatch.setattr(client, "place_order", mock_place_order)
+
+    am.process_stc_order(client, acct_num, VALID_ORD_INPUT, USR_SET)
+    logged = caplog.text
+    assert logged.split()[-1] == "PASAR"
+
+
+def test_process_stc_order_existing_orders_no_reduce(monkeypatch, caplog):
+    """An STC order with no existing STC order and no reduce flag
+    results in an STC market order"""
+    caplog.set_level(logging.INFO)
+    pos_qty = 1
+    client = tda.client.Client
+    acct_num = "123456789"
+
+    class MockResponse:
+        def __init__(self, content):
+            self.content = content
+
+    def mock_get_position_quant(client, acct_id, symbol):
+        return pos_qty
+
+    def mock_get_existing_stc_orders(client, option_symbol):
+        if option_symbol == "SPY_030321P380":
+            return ["345", "456"]
+        else:
+            raise ValueError("Expected option symbol not received")
+
+    def mock_cancel_order(ord_id, acct_num):
+        if ord_id in ["345", "456"]:
+            return MockResponse(f"CANCELLED:{ord_id}")
+
+    def mock_place_order(acct_num, order_spec):
+        built_order = order_spec.build()
+        if built_order["orderLegCollection"][0]["quantity"] == pos_qty:
+            return "PASAR"
+        else:
+            raise ValueError("STC market quantity does not match expected value")
+
+    monkeypatch.setattr(am, "get_position_quant", mock_get_position_quant)
+    monkeypatch.setattr(am, "get_existing_stc_orders", mock_get_existing_stc_orders)
+    monkeypatch.setattr(client, "cancel_order", mock_cancel_order)
+    monkeypatch.setattr(client, "place_order", mock_place_order)
+
+    am.process_stc_order(client, acct_num, VALID_ORD_INPUT, USR_SET)
+    logged = caplog.text
+    assert logged.split()[2] == "CANCELLED:345"
+    assert logged.split()[5] == "CANCELLED:456"
+    assert logged.split()[-1] == "PASAR"
+
+
+def test_process_stc_order_existing_orders_reduce(monkeypatch, caplog):
+    """An STC order with no existing STC order and no reduce flag
+    results in an STC market order"""
+    caplog.set_level(logging.INFO)
+    pos_qty = 10
+    client = tda.client.Client
+    acct_num = "123456789"
+    flags = {"SL": None, "risk_level": None, "reduce": 0.75}
+    monkeypatch.setitem(VALID_ORD_INPUT, "flags", flags)
+
+    class MockResponse:
+        def __init__(self, content):
+            self.content = content
+
+    def mock_get_position_quant(client, acct_id, symbol):
+        return pos_qty
+
+    def mock_get_existing_stc_orders(client, option_symbol):
+        if option_symbol == "SPY_030321P380":
+            return ["345", "456"]
+        else:
+            raise ValueError("Expected option symbol not received")
+
+    def mock_cancel_order(ord_id, acct_num):
+        if ord_id in ["345", "456"]:
+            return MockResponse(f"CANCELLED:{ord_id}")
+
+    def mock_place_order(acct_num, order_spec):
+        built_order = order_spec.build()
+        return str(built_order["orderLegCollection"][0]["quantity"])
+
+    monkeypatch.setattr(am, "get_position_quant", mock_get_position_quant)
+    monkeypatch.setattr(am, "get_existing_stc_orders", mock_get_existing_stc_orders)
+    monkeypatch.setattr(client, "cancel_order", mock_cancel_order)
+    monkeypatch.setattr(client, "place_order", mock_place_order)
+
+    am.process_stc_order(client, acct_num, VALID_ORD_INPUT, USR_SET)
+    logged = caplog.text
+    assert logged.split()[2] == "CANCELLED:345"
+    assert logged.split()[5] == "CANCELLED:456"
+    assert logged.split()[35] == "8"
+    assert logged.split()[65] == "2"
 
 
 def test_get_position_quant(monkeypatch):
