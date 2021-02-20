@@ -157,7 +157,6 @@ POSITIONS = {
 }
 
 
-
 def test_authenticate_tda_account_token(monkeypatch):
     """Testing authentication flow with valid token"""
 
@@ -168,7 +167,7 @@ def test_authenticate_tda_account_token(monkeypatch):
     assert am.authenticate_tda_account("path.json", "key", "uri") == tda.client.Client
 
 
-def test_calc_buy_order():
+def test_calc_buy_order_quantity():
     """Returns rounded-down integer"""
     ret_val = am.calc_buy_order_quantity(price=1, ord_val=100, limit_percent=0)
     assert isinstance(ret_val, int)
@@ -176,7 +175,57 @@ def test_calc_buy_order():
     assert am.calc_buy_order_quantity(price=1, ord_val=100, limit_percent=0.1) == 0
 
 
-def test_process_stc_order_no_pos(monkeypatch, capsys):
+def test_calc_buy_limit_price():
+    """Buy limit is correctly calculated """
+    contract_price_buy_lim_per = [
+        (1.00, 0.3334, 1.33),
+        (5.00, 0, 5.00),
+        (10.00, 0.02, 10.20),
+    ]
+    for tup in contract_price_buy_lim_per:
+        assert math.isclose(am.calc_buy_limit_price(tup[0], tup[1]), tup[2])
+
+
+def test_calc_sl_percentage():
+    """SL percentage is correctly calculated """
+    contract_price_sl_price = [
+        (1.00, 0.333, 0.667),
+        (5.00, 2.50, 0.50),
+        (10.00, 0.10, 0.99),
+    ]
+    for tup in contract_price_sl_price:
+        assert math.isclose(am.calc_sl_percentage(tup[0], tup[1]), tup[2])
+
+
+def test_calc_sl_price():
+    """SL prices are correctly calculated """
+    contract_price_sl_percent = [
+        (1.00, 0.333, 0.67),
+        (5.00, 0.5, 2.50),
+        (10.00, 0.01, 9.90),
+    ]
+    for tup in contract_price_sl_percent:
+        assert math.isclose(am.calc_sl_price(tup[0], tup[1]), tup[2])
+
+
+def test_build_bto_order_w_stop_loss():
+    symbol = "SPY_030321P380"
+    ota = am.build_bto_order_w_stop_loss(symbol, 10, 1.02, 0.85, kill_fill=True)
+    ota_dict = ota.build()
+    assert ota_dict["duration"] == "FILL_OR_KILL"
+    assert ota_dict["orderType"] == "LIMIT"
+    assert ota_dict["orderLegCollection"][0]["instruction"] == "BUY_TO_OPEN"
+    assert ota_dict["orderStrategyType"] == "TRIGGER"
+    assert ota_dict["childOrderStrategies"][0]["duration"] == "GOOD_TILL_CANCEL"
+    assert ota_dict["childOrderStrategies"][0]["orderType"] == "STOP"
+    assert ota_dict["childOrderStrategies"][0]["orderLegCollection"][0]["instruction"] == "SELL_TO_CLOSE"
+
+    ota = am.build_bto_order_w_stop_loss(symbol, 10, 1.02, 0.85, kill_fill=False)
+    ota_dict = ota.build()
+    assert ota_dict["duration"] == "DAY"
+
+
+def test_process_stc_order_no_pos(monkeypatch, caplog):
     """An STC order does nothing if there is no long position"""
     client = tda.client.Client
     acct_num = "1234567890"
@@ -187,7 +236,8 @@ def test_process_stc_order_no_pos(monkeypatch, capsys):
     monkeypatch.setitem(VALID_ORD_INPUT, "ticker", "XYZ")
     monkeypatch.setattr(am, "get_position_quant", mock_get_position_quant)
     am.process_stc_order(client, acct_num, VALID_ORD_INPUT, USR_SET)
-    assert capsys.readouterr().out == ""  #TODO: wrong fix
+    logged = caplog.text
+    assert len(logged) == 0
 
 
 def test_process_stc_order_no_existing_orders_no_reduce(monkeypatch, caplog):
@@ -224,8 +274,8 @@ def test_process_stc_order_no_existing_orders_no_reduce(monkeypatch, caplog):
 
 
 def test_process_stc_order_existing_orders_no_reduce(monkeypatch, caplog):
-    """An STC order with no existing STC order and no reduce flag
-    results in an STC market order"""
+    """An STC order with existing STC orders and no reduce flag cancels existing orders
+    and results in an STC market order"""
     caplog.set_level(logging.INFO)
     pos_qty = 1
     client = tda.client.Client
@@ -268,8 +318,8 @@ def test_process_stc_order_existing_orders_no_reduce(monkeypatch, caplog):
 
 
 def test_process_stc_order_existing_orders_reduce(monkeypatch, caplog):
-    """An STC order with no existing STC order and no reduce flag
-    results in an STC market order"""
+    """An STC order with existing STC orders and the reduce flag cancels existing
+    orders and results in both an STC market order and an STC stop loss order"""
     caplog.set_level(logging.INFO)
     pos_qty = 10
     client = tda.client.Client
