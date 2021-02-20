@@ -114,12 +114,10 @@ def process_bto_order(client, acct_num: str, ord_params: dict, usr_set: dict):
         order_value = usr_set["high_risk_ord_val"]
     else:
         order_value = usr_set["max_ord_val"]
-    print(order_value)
     # determine purchase quantity
     buy_qty = calc_buy_order_quantity(
         ord_params["contract_price"], order_value, usr_set["buy_limit_percent"],
     )
-    print(buy_qty)
     if buy_qty >= 1:
         option_symbol = build_option_symbol(ord_params)
 
@@ -130,7 +128,6 @@ def process_bto_order(client, acct_num: str, ord_params: dict, usr_set: dict):
             rec_sl_percent = calc_sl_percentage(ord_params["contract_price"], rec_sl)
             if rec_sl_percent < usr_set["SL_percent"]:
                 sl_percent = rec_sl_percent
-        print(sl_percent)
         sl_price = calc_sl_price(ord_params["contract_price"], sl_percent)
         buy_lim_price = calc_buy_limit_price(
             ord_params["contract_price"], usr_set["buy_limit_percent"]

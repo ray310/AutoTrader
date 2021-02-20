@@ -14,7 +14,6 @@ USR_SET = {
     "SL_percent": 0.25,
 }
 
-
 VALID_ORD_INPUT = {
     "instruction": "STC",
     "ticker": "SPY",
@@ -167,6 +166,141 @@ def test_authenticate_tda_account_token(monkeypatch):
     assert am.authenticate_tda_account("path.json", "key", "uri") == tda.client.Client
 
 
+def test_authenticate_tda_account_file_not_found(monkeypatch):
+    def mock_client_from_token_file(token_path, api_key):
+        raise FileNotFoundError
+
+    def mock_client_from_login_flow(driver, api_key, redirect_uri, token_path):
+        return tda.client.Client
+
+    monkeypatch.setattr(tda.auth, "client_from_token_file", mock_client_from_token_file)
+    monkeypatch.setattr(tda.auth, "client_from_login_flow", mock_client_from_login_flow)
+    assert (
+        am.authenticate_tda_account("path.json", "mock_key", "127.0.0.1")
+        == tda.client.Client
+    )
+
+
+def test_process_bto_order_low_quantity(monkeypatch, capsys):
+    client = client = tda.client.Client
+    monkeypatch.setitem(USR_SET, "max_ord_val", 100)  # buy_qty will be less than 1
+    am.process_bto_order(client, "1234567890", VALID_ORD_INPUT, USR_SET)
+    captured = capsys.readouterr()
+    msg1 = f"{VALID_ORD_INPUT} purchase quantity is 0\n"
+    msg2 = "This may be due to a low max order value or high buy limit percent\n\n"
+    assert captured.err == msg1 + msg2
+
+
+def test_process_bto_order_low_risk(monkeypatch, capsys, caplog):
+    """BTO order should be correctly processed with no risk or SL flag set """
+    caplog.set_level(logging.INFO)
+    monkeypatch.setitem(USR_SET, "max_ord_value", 2000)
+    monkeypatch.setitem(USR_SET, "buy_limit_percent", .03)
+    monkeypatch.setitem(USR_SET, "SL_percent", 0.25)
+    monkeypatch.setitem(VALID_ORD_INPUT, "contract_price", 2.00)
+
+    def mock_place_order(acct_num, order_spec):
+        built_order = order_spec.build()
+        assert built_order["price"] == "2.06"
+        assert built_order["orderLegCollection"][0]["quantity"] == 9
+        assert built_order["orderStrategyType"] == "TRIGGER"
+        assert built_order["childOrderStrategies"][0]["orderType"] == "STOP"
+        assert built_order["childOrderStrategies"][0]["stopPrice"] == "1.50"
+        return "PASSER"
+
+    client = tda.client.Client
+    monkeypatch.setattr(client, "place_order", mock_place_order)
+    am.process_bto_order(client, "1234567890", VALID_ORD_INPUT, USR_SET)
+    captured = capsys.readouterr()
+    assert captured.out.split()[-1] == "PASSER"
+    logged = caplog.text
+    assert logged.split()[-1] == "PASSER"
+
+
+def test_process_bto_order_high_risk(monkeypatch, capsys, caplog):
+    """BTO order should be correctly processed with high risk flag set """
+    caplog.set_level(logging.INFO)
+    monkeypatch.setitem(USR_SET, "high_risk_ord_value", 1000)
+    monkeypatch.setitem(USR_SET, "buy_limit_percent", .03)
+    monkeypatch.setitem(USR_SET, "SL_percent", 0.25)
+    monkeypatch.setitem(VALID_ORD_INPUT, "contract_price", 2.00)
+    flags = {"SL": None, "risk_level": "high risk", "reduce": None}
+    monkeypatch.setitem(VALID_ORD_INPUT, "flags", flags)
+
+    def mock_place_order(acct_num, order_spec):
+        built_order = order_spec.build()
+        assert built_order["price"] == "2.06"
+        assert built_order["orderLegCollection"][0]["quantity"] == 4
+        assert built_order["orderStrategyType"] == "TRIGGER"
+        assert built_order["childOrderStrategies"][0]["orderType"] == "STOP"
+        assert built_order["childOrderStrategies"][0]["stopPrice"] == "1.50"
+        return "PASSAR"
+
+    client = tda.client.Client
+    monkeypatch.setattr(client, "place_order", mock_place_order)
+    am.process_bto_order(client, "1234567890", VALID_ORD_INPUT, USR_SET)
+    captured = capsys.readouterr()
+    assert captured.out.split()[-1] == "PASSAR"
+    logged = caplog.text
+    assert logged.split()[-1] == "PASSAR"
+
+
+def test_process_bto_order_flagged_sl(monkeypatch, capsys, caplog):
+    """BTO order should be correctly processed with stop loss flag set """
+    caplog.set_level(logging.INFO)
+    monkeypatch.setitem(USR_SET, "max_ord_value", 2000)
+    monkeypatch.setitem(USR_SET, "buy_limit_percent", .03)
+    monkeypatch.setitem(USR_SET, "SL_percent", 0.25)
+    monkeypatch.setitem(VALID_ORD_INPUT, "contract_price", 2.00)
+    flags = {"SL": 1.75, "risk_level": None, "reduce": None}
+    monkeypatch.setitem(VALID_ORD_INPUT, "flags", flags)
+
+    def mock_place_order(acct_num, order_spec):
+        built_order = order_spec.build()
+        assert built_order["price"] == "2.06"
+        assert built_order["orderLegCollection"][0]["quantity"] == 9
+        assert built_order["orderStrategyType"] == "TRIGGER"
+        assert built_order["childOrderStrategies"][0]["orderType"] == "STOP"
+        assert built_order["childOrderStrategies"][0]["stopPrice"] == "1.75"
+        return "PASSARE"
+
+    client = tda.client.Client
+    monkeypatch.setattr(client, "place_order", mock_place_order)
+    am.process_bto_order(client, "1234567890", VALID_ORD_INPUT, USR_SET)
+    captured = capsys.readouterr()
+    assert captured.out.split()[-1] == "PASSARE"
+    logged = caplog.text
+    assert logged.split()[-1] == "PASSARE"
+
+
+def test_process_bto_order_flagged_sl_ignored(monkeypatch, capsys, caplog):
+    """BTO order should use more conservative of two stop losses  """
+    caplog.set_level(logging.INFO)
+    monkeypatch.setitem(USR_SET, "max_ord_value", 2000)
+    monkeypatch.setitem(USR_SET, "buy_limit_percent", .03)
+    monkeypatch.setitem(USR_SET, "SL_percent", 0.25)
+    monkeypatch.setitem(VALID_ORD_INPUT, "contract_price", 2.00)
+    flags = {"SL": 1.48, "risk_level": None, "reduce": None}
+    monkeypatch.setitem(VALID_ORD_INPUT, "flags", flags)
+
+    def mock_place_order(acct_num, order_spec):
+        built_order = order_spec.build()
+        assert built_order["price"] == "2.06"
+        assert built_order["orderLegCollection"][0]["quantity"] == 9
+        assert built_order["orderStrategyType"] == "TRIGGER"
+        assert built_order["childOrderStrategies"][0]["orderType"] == "STOP"
+        assert built_order["childOrderStrategies"][0]["stopPrice"] == "1.50"
+        return "PASSING"
+
+    client = tda.client.Client
+    monkeypatch.setattr(client, "place_order", mock_place_order)
+    am.process_bto_order(client, "1234567890", VALID_ORD_INPUT, USR_SET)
+    captured = capsys.readouterr()
+    assert captured.out.split()[-1] == "PASSING"
+    logged = caplog.text
+    assert logged.split()[-1] == "PASSING"
+
+
 def test_calc_buy_order_quantity():
     """Returns rounded-down integer"""
     ret_val = am.calc_buy_order_quantity(price=1, ord_val=100, limit_percent=0)
@@ -218,7 +352,10 @@ def test_build_bto_order_w_stop_loss():
     assert ota_dict["orderStrategyType"] == "TRIGGER"
     assert ota_dict["childOrderStrategies"][0]["duration"] == "GOOD_TILL_CANCEL"
     assert ota_dict["childOrderStrategies"][0]["orderType"] == "STOP"
-    assert ota_dict["childOrderStrategies"][0]["orderLegCollection"][0]["instruction"] == "SELL_TO_CLOSE"
+    assert (
+        ota_dict["childOrderStrategies"][0]["orderLegCollection"][0]["instruction"]
+        == "SELL_TO_CLOSE"
+    )
 
     ota = am.build_bto_order_w_stop_loss(symbol, 10, 1.02, 0.85, kill_fill=False)
     ota_dict = ota.build()
