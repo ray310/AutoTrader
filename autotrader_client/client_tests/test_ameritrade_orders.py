@@ -25,7 +25,7 @@ VALID_ORD_INPUT = {
     "flags": {"SL": None, "risk_level": None, "reduce": None},
 }
 
-ORD_JSON_DICT = {
+ORDERS = {
     "session": "NORMAL",
     "duration": "DAY",
     "orderType": "LIMIT",
@@ -156,6 +156,50 @@ POSITIONS = {
 }
 
 
+def test_initialize_order_bto(monkeypatch):
+    """Validated BTO order should lead to process BTO order function"""
+
+    def mock_client_from_token_file(token_path, api_key):
+        return tda.client.Client
+
+    def mock_process_bto_order(client, acct_num, order_params, usr_set):
+        assert order_params["instruction"] == "BTO"
+
+    monkeypatch.setattr(tda.auth, "client_from_token_file", mock_client_from_token_file)
+    monkeypatch.setattr(am, "process_bto_order", mock_process_bto_order)
+    monkeypatch.setitem(VALID_ORD_INPUT, "instruction", "BTO")
+    am.initialize_order(VALID_ORD_INPUT)
+
+
+def test_initialize_order_stc(monkeypatch):
+    """Validated STC order should lead to process STC order function"""
+
+    def mock_client_from_token_file(token_path, api_key):
+        return tda.client.Client
+
+    def mock_process_stc_order(client, acct_num, order_params, usr_set):
+        assert order_params["instruction"] == "STC"
+
+    monkeypatch.setattr(tda.auth, "client_from_token_file", mock_client_from_token_file)
+    monkeypatch.setattr(am, "process_stc_order", mock_process_stc_order)
+    am.initialize_order(VALID_ORD_INPUT)
+
+
+def test_initialize_order_other(monkeypatch, caplog):
+    """Instruction other than BTO or STC should not be processed and should output
+    a warning"""
+    caplog.set_level(logging.WARNING)
+
+    def mock_client_from_token_file(token_path, api_key):
+        return tda.client.Client
+
+    monkeypatch.setattr(tda.auth, "client_from_token_file", mock_client_from_token_file)
+    monkeypatch.setitem(VALID_ORD_INPUT, "instruction", "ABC")
+    am.initialize_order(VALID_ORD_INPUT)
+    logged = caplog.text
+    assert logged.split()[-1] == "ABC"
+
+
 def test_authenticate_tda_account_token(monkeypatch):
     """Testing authentication flow with valid token"""
 
@@ -195,7 +239,7 @@ def test_process_bto_order_low_risk(monkeypatch, capsys, caplog):
     """BTO order should be correctly processed with no risk or SL flag set """
     caplog.set_level(logging.INFO)
     monkeypatch.setitem(USR_SET, "max_ord_value", 2000)
-    monkeypatch.setitem(USR_SET, "buy_limit_percent", .03)
+    monkeypatch.setitem(USR_SET, "buy_limit_percent", 0.03)
     monkeypatch.setitem(USR_SET, "SL_percent", 0.25)
     monkeypatch.setitem(VALID_ORD_INPUT, "contract_price", 2.00)
 
@@ -221,7 +265,7 @@ def test_process_bto_order_high_risk(monkeypatch, capsys, caplog):
     """BTO order should be correctly processed with high risk flag set """
     caplog.set_level(logging.INFO)
     monkeypatch.setitem(USR_SET, "high_risk_ord_value", 1000)
-    monkeypatch.setitem(USR_SET, "buy_limit_percent", .03)
+    monkeypatch.setitem(USR_SET, "buy_limit_percent", 0.03)
     monkeypatch.setitem(USR_SET, "SL_percent", 0.25)
     monkeypatch.setitem(VALID_ORD_INPUT, "contract_price", 2.00)
     flags = {"SL": None, "risk_level": "high risk", "reduce": None}
@@ -249,7 +293,7 @@ def test_process_bto_order_flagged_sl(monkeypatch, capsys, caplog):
     """BTO order should be correctly processed with stop loss flag set """
     caplog.set_level(logging.INFO)
     monkeypatch.setitem(USR_SET, "max_ord_value", 2000)
-    monkeypatch.setitem(USR_SET, "buy_limit_percent", .03)
+    monkeypatch.setitem(USR_SET, "buy_limit_percent", 0.03)
     monkeypatch.setitem(USR_SET, "SL_percent", 0.25)
     monkeypatch.setitem(VALID_ORD_INPUT, "contract_price", 2.00)
     flags = {"SL": 1.75, "risk_level": None, "reduce": None}
@@ -277,7 +321,7 @@ def test_process_bto_order_flagged_sl_ignored(monkeypatch, capsys, caplog):
     """BTO order should use more conservative of two stop losses  """
     caplog.set_level(logging.INFO)
     monkeypatch.setitem(USR_SET, "max_ord_value", 2000)
-    monkeypatch.setitem(USR_SET, "buy_limit_percent", .03)
+    monkeypatch.setitem(USR_SET, "buy_limit_percent", 0.03)
     monkeypatch.setitem(USR_SET, "SL_percent", 0.25)
     monkeypatch.setitem(VALID_ORD_INPUT, "contract_price", 2.00)
     flags = {"SL": 1.48, "risk_level": None, "reduce": None}
@@ -524,7 +568,7 @@ def test_get_position_quant(monkeypatch):
 def test_get_existing_stc_orders_valid(monkeypatch):
     """Orders containing valid STC orders return order ids """
     # prepare test orders
-    orders = [copy.deepcopy(ORD_JSON_DICT) for i in range(2)]
+    orders = [copy.deepcopy(ORDERS) for i in range(2)]
 
     # Active STC order, orderId should be returned
     orders[0]["orderLegCollection"][0]["instruction"] = "SELL_TO_CLOSE"
@@ -557,7 +601,7 @@ def test_get_existing_stc_orders_valid(monkeypatch):
 def test_get_existing_stc_orders_invalid(monkeypatch):
     """ Orders not containing valid STC order return empty list"""
     # prepare test orders
-    orders = [copy.deepcopy(ORD_JSON_DICT) for i in range(3)]
+    orders = [copy.deepcopy(ORDERS) for i in range(3)]
 
     # Active STC order, orderId should be returned
     orders[0]["orderLegCollection"][0]["instruction"] = "SELL_TO_CLOSE"
@@ -588,7 +632,7 @@ def test_get_existing_stc_orders_invalid(monkeypatch):
 
 def test_check_stc_order_valid():
     """STC orders should return order is number as a string"""
-    order = copy.deepcopy(ORD_JSON_DICT)
+    order = copy.deepcopy(ORDERS)
     symbol = "TSLA_030521P520"
     order["orderLegCollection"][0]["instruction"] = "SELL_TO_CLOSE"
     statuses = ["WORKING", "QUEUED", "ACCEPTED"]
@@ -599,7 +643,7 @@ def test_check_stc_order_valid():
 
 def test_check_stc_order_invalid():
     """Invalid orders should return None"""
-    order = copy.deepcopy(ORD_JSON_DICT)
+    order = copy.deepcopy(ORDERS)
     symbol = "TSLA_030521P520"
 
     # BTO returns None
