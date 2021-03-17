@@ -182,7 +182,7 @@ def build_bto_order_w_stop_loss(
     )
     if kill_fill is True:
         bto_lim.set_duration(tda.orders.common.Duration.FILL_OR_KILL)
-    stc_stop_market = build_stc_stop_market(option_symbol, qty, sl_price)
+    stc_stop_market = build_stc_stop_market_order(option_symbol, qty, sl_price)
     one_trigger_other = tda.orders.common.first_triggers_second(
         bto_lim, stc_stop_market
     )
@@ -215,11 +215,14 @@ def process_stc_order(client, acct_num: str, ord_params: dict, usr_set: dict):
             new_sl_price = calc_sl_price(
                 ord_params["contract_price"], usr_set["SL_percent"]
             )
-            stc_stop = build_stc_stop_market(option_symbol, keep_qty, new_sl_price)
-            response_stop = client.place_order(acct_num, order_spec=stc_stop)
-
             output_response(ord_params, response_stc)
-            output_response(ord_params, response_stop)
+
+            if keep_qty > 0:
+                stc_stop = build_stc_stop_market_order(
+                    option_symbol, keep_qty, new_sl_price
+                )
+                response_stop = client.place_order(acct_num, order_spec=stc_stop)
+                output_response(ord_params, response_stop)
 
         # else sell the entire position
         else:
@@ -298,11 +301,11 @@ def build_stc_market_order(symbol: str, pos_qty: float):
     return tda.orders.options.option_sell_to_close_market(symbol, pos_qty)
 
 
-def build_stc_stop_market(symbol: str, qty: int, stop_price: float):
+def build_stc_stop_market_order(symbol: str, qty: int, stop_price: float):
     """Return an OrderBuilder object for a STC stop-market order"""
-    ord = tda.orders.options.option_sell_to_close_market(symbol, qty)
-    ord.set_duration(tda.orders.common.Duration.GOOD_TILL_CANCEL)
-    ord.set_order_type(tda.orders.common.OrderType.STOP)
+    order = tda.orders.options.option_sell_to_close_market(symbol, qty)
+    order.set_duration(tda.orders.common.Duration.GOOD_TILL_CANCEL)
+    order.set_order_type(tda.orders.common.OrderType.STOP)
     trunc_price = round(stop_price, 2)
-    ord.set_stop_price(trunc_price)  # truncated float
-    return ord
+    order.set_stop_price(trunc_price)  # truncated float
+    return order

@@ -685,14 +685,14 @@ def test_build_stc_market_order():
         am.build_stc_market_order(VALID_ORD_INPUT, 0)
 
 
-def test_build_stc_stop_market():
+def test_build_stc_stop_market_order():
     """Returned order should be stop (stop-market), good until canceled and correctly
     round floats"""
     symbol = "TSLA_030521P520"
     qty = 3
     stop_price_truncated = [(3.3451, 3.35), (0.1449, 0.14)]
     for prices in stop_price_truncated:
-        order = am.build_stc_stop_market(symbol, qty, stop_price=prices[0])
+        order = am.build_stc_stop_market_order(symbol, qty, stop_price=prices[0])
         assert order._duration == "GOOD_TILL_CANCEL"
         assert order._orderType == "STOP"
         assert math.isclose(float(order._stopPrice), prices[1])
