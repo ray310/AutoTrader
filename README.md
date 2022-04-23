@@ -5,7 +5,7 @@ It consists of two components:
 - A server hosted in Google Cloud Platform (GCP) that parses text from a Discord bot for trade signals from selected options traders and analysts
 - A locally hosted client that listens to the server for new trade signals and places validated orders with a TD Ameritrade brokerage account
 
-AutoTrader is currently a functioning prototype and still in development
+AutoTrader is currently a functioning prototype
 
 ## Installation
 
