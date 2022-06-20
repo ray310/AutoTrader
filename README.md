@@ -19,5 +19,5 @@ For AutoTrader Client configuration help see "docs/Setting Up AutoTrader Client.
 1. Ensure you understand and have adjusted the brokerage order parameters in "config/order_guideslines.json"
 - **Order Value** is the dollar-value upper limit to each individual order
 - **Buy Limit Percentage** is used to calculate limit prices on a buy order. It represents how high above the signaled option contract price that a buy-limit order will be set
-- **SL Percantage** is used to set stop-loss sell orders that accompany all buy orders. It represents the percentage below the signaled option price that a stop-market order will be set
+- **SL Percentage** is used to set stop-loss sell orders that accompany all buy orders. It represents the percentage below the signaled option price that a stop-market order will be set
 2. Set your working directory to the auto_trader_client directory and run client.py
